@@ -11,7 +11,7 @@ What you get:
 - A library of your history, bookmarks (stories, comments and people) and highlights, with backup and restore as one JSON file.
 - Search from the top bar (press `/`): stories, comments, Ask HN, Show HN and jobs, sorted by popularity or date, over any time range, with matches marked and results that stay in the redesign.
 - Profile cards when you hover a username, a selection menu (highlight, quote into your reply, copy, read aloud, search), and keyboard shortcuts. Press `?` on any page to see them.
-- One click back to the original design, and one click to return.
+- One click back to the original design, and one click to return. HN has no search page of its own, so in the original design a search opens on hn.algolia.com.
 
 ## Privacy
 

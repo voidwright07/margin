@@ -4,7 +4,7 @@
 //   pnpm build:chrome && node scripts/e2e.mjs
 
 import assert from 'node:assert/strict';
-import { algoliaRespond, launch, sleep } from './harness.mjs';
+import { algoliaRespond, HN, launch, sleep } from './harness.mjs';
 
 const requests = [];
 const algolia = [];
@@ -560,6 +560,34 @@ await check('story results carry the bookmark action', async () => {
   assert.equal(bookmarks[0].type, 'story');
   assert.equal(bookmarks[0].id, 22238335);
   assert.equal(bookmarks[0].snapshot.site, 'blog.discordapp.com');
+});
+
+const algoliaPage = async () => {
+  for (let i = 0; i < 60; i++) {
+    const hit = algolia.find((u) => u.pathname === '/');
+    if (hit) return hit.href;
+    await sleep(50);
+  }
+  return null;
+};
+
+await check('in the original design, /search goes to the same search on hn.algolia.com', async () => {
+  // Leave any search page first: switching the design off there redirects it too, which would race this check.
+  await open('news');
+  algolia.length = 0;
+  await resetStorage({ enabled: false });
+  // The redirect can cancel the page's own load, which goto reports as ERR_ABORTED.
+  await page.goto(`${HN}search?q=rust&type=comment&sort=date&p=2`, { waitUntil: 'load' }).catch((e) => {
+    if (!e.message.includes('ERR_ABORTED')) throw e;
+  });
+  assert.equal(await algoliaPage(), 'https://hn.algolia.com/?query=rust&type=comment&sort=byDate&dateRange=all&page=1');
+  assert.equal(algolia.filter((u) => u.pathname.startsWith('/api/')).length, 0, 'no API search in the original design');
+  await resetStorage();
+  await open('search?q=rust');
+  await settled();
+  algolia.length = 0;
+  await page.click('button[aria-label="Show original design"]');
+  assert.equal(await algoliaPage(), 'https://hn.algolia.com/?query=rust&type=story&sort=byPopularity&dateRange=all&page=0');
 });
 
 await check('search results stay text: no markup from the response reaches the page', async () => {

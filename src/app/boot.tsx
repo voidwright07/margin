@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { parsePage } from '../hn/registry';
 import type { Page } from '../hn/types';
+import { parseQuery, toAlgoliaWeb } from '../search/query';
 import type { Settings } from '../store/schema';
 import { loadState, readBootHint, subscribe, updateSettings } from '../store/store';
 import { App } from '../ui/App';
@@ -72,6 +73,11 @@ function ReturnPill() {
 
 const setMode = (next: Mode) => {
   if (next === mode) return;
+  // HN has no search page; the original design would strand the reader on "Unknown.", so search on Algolia instead.
+  if (next === 'original' && page?.kind === 'search') {
+    location.replace(toAlgoliaWeb(parseQuery(new URLSearchParams(location.search))));
+    return;
+  }
   mode = next;
   const el = ensureRoot();
   render(null, el);
