@@ -1,4 +1,5 @@
 import type { Page } from '../hn/types';
+import { DEFAULT_QUERY, toUrl } from '../search/query';
 import { userBookmark } from '../store/ops';
 import { Adopt } from './Adopt';
 import { BookmarkButton, MoreLink, PageHead, plural, profileTabFor, ProfileTabs } from './common';
@@ -62,6 +63,9 @@ export function Profile({ page }: { page: UserPage }) {
             <span title={new Date(user.created * 1000).toISOString()}>
               joined {user.createdText}, {memberFor(user.created)} ago
             </span>
+            <a href={toUrl({ ...DEFAULT_QUERY, author: user.id, type: 'all' })} data-mg-search-author>
+              Search {user.id}'s posts
+            </a>
           </p>
         </div>
         <BookmarkButton label="user" make={() => userBookmark({ id: user.id, karma: user.karma }, Date.now())} />

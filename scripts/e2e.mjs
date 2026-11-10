@@ -532,6 +532,24 @@ await check('a 429 shows the rate-limit state, and Try again recovers', async ()
   assert.equal(await firstTitle(), 'Why Discord is switching from Go to Rust');
 });
 
+await check('profiles and from?site pages search their author or site natively', async () => {
+  await resetStorage();
+  await open('user?id=dang');
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click('[data-mg-search-author]')]);
+  await settled();
+  assert.equal(await here(), 'search?type=all&author=dang');
+  assert.equal(lastRequest().href, `${API}search?query=&tags=author_dang`);
+  assert.match(await page.$eval('.mg-chip', (c) => c.textContent), /^by dang/);
+  await open('from?site=github.com');
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click('[data-mg-search-site]')]);
+  await settled();
+  assert.equal(await here(), 'search?site=github.com');
+  assert.equal(lastRequest().href, `${API}search?query=github.com&tags=story&restrictSearchableAttributes=url`);
+  await page.click('.mg-chip');
+  await page.waitForFunction(() => location.search === '');
+  assert.equal(await page.$eval('.mg-search-state h2', (h) => h.textContent), 'Search Hacker News', 'removing the only filter leaves a blank search');
+});
+
 await check('story results carry the bookmark action', async () => {
   await resetStorage();
   await open('search?q=rust');

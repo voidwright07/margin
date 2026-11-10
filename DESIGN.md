@@ -97,6 +97,7 @@ type SearchResult = { hits: Array<StoryHit | CommentHit>; total: number; page: n
 - History: typing updates the field at once, then after 300 ms replaces the current entry's URL and searches. Enter, a filter and a page link push an entry. Before pushing, the controller restores the last deliberate URL on the current entry, so Back returns to the previous search and never to a half-typed draft. `popstate` reparses the URL.
 - Story hits render through the same `StoryRow` as story lists, so they get the bookmark action, visited state and new-comment badges. Comment hits show author, age (linking to the comment), "on:" the story, and the clamped text.
 - The search page hides HN's loose "Unknown." text node with the same adopt-and-restore helper passthrough pages use, and `boot.tsx` adds a mobile viewport meta when a page has none, as that 404 page does not.
+- Entry points: the top-bar field on every page (`/`), the selection popup's Search HN, "Search <name>'s posts" on a profile (`author=` with type All), and "Search <site>" on HN's own `from?site=` page. Domain links on story rows still open `from?site=`, which HN serves and Margin already redesigns.
 
 ## Persistent state
 

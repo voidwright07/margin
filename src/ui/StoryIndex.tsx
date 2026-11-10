@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import type { Page, Story } from '../hn/types';
+import { DEFAULT_QUERY, toUrl } from '../search/query';
 import { newCommentCount, storyBookmark } from '../store/ops';
 import type { HistoryEntry, TableColumn } from '../store/schema';
 import { useStore } from '../store/store';
@@ -237,6 +238,7 @@ export function StoryIndex({ page }: { page: StoriesPage }) {
   const [hidden, setHidden] = useState<ReadonlySet<number>>(new Set());
   const stories = page.stories.filter((s) => !hidden.has(s.id));
   const profile = profileTabFor(page.meta);
+  const fromSite = page.meta.section === 'from' ? page.meta.url.searchParams.get('site') : null;
   const newTab = settings.openLinksInNewTab;
 
   let body;
@@ -274,6 +276,14 @@ export function StoryIndex({ page }: { page: StoriesPage }) {
       )}
       {page.meta.section === 'front' && <FrontDayNav meta={page.meta} heading={page.heading} />}
       {page.meta.section !== 'front' && page.heading && <p class="mg-heading">{page.heading}</p>}
+      {fromSite && (
+        <p class="mg-heading mg-from-head">
+          <span>Stories from {fromSite}</span>
+          <a href={toUrl({ ...DEFAULT_QUERY, site: fromSite })} data-mg-search-site>
+            Search {fromSite}
+          </a>
+        </p>
+      )}
       {stories.length === 0 ? <p class="mg-empty">No stories here yet.</p> : body}
       <MoreLink href={page.more} />
     </div>
