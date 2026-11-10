@@ -4,7 +4,7 @@
 
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { launch, ROOT, sleep } from './harness.mjs';
+import { algoliaRespond, launch, ROOT, sleep } from './harness.mjs';
 
 const OUT = resolve(process.argv[2] ?? join(ROOT, '.cache', 'shots'));
 const FILTER = process.argv[3] ?? '';
@@ -88,10 +88,34 @@ SCENES.push(
   { name: 'synthetic-deep-mobile-light', path: 'item?id=9200', scrollTo: '[id="9203"]', viewport: MOBILE },
   { name: 'synthetic-deep-mobile-dark', path: 'item?id=9200', scheme: 'dark', scrollTo: '[id="9203"]', viewport: MOBILE },
   { name: 'new-replies-light', path: 'item?id=50442736', scrollTo: '.mg-thread-bar', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] } }, seenAllBut: 6 },
+  { name: 'from-site-light', path: 'from?site=github.com' },
+  { name: 'search-idle-light', path: 'search' },
+  { name: 'search-results-light', path: 'search?q=rust' },
+  { name: 'search-results-dark', path: 'search?q=rust', scheme: 'dark' },
+  { name: 'search-comments-light', path: 'search?q=rust&type=comment' },
+  { name: 'search-comments-dark', path: 'search?q=rust&type=comment&sort=date', scheme: 'dark' },
+  { name: 'search-ask-week-light', path: 'search?q=hiring&type=ask_hn&range=week' },
+  { name: 'search-filters-light', path: 'search?q=rust&author=pg&site=github.com&type=all' },
+  { name: 'search-pager-light', path: 'search?q=rust&p=2', scrollTo: '.mg-pager' },
+  { name: 'search-empty-light', path: 'search?q=zzqqxx&range=month' },
+  { name: 'search-loading-light', path: 'search?q=rust', algolia: 'hang' },
+  { name: 'search-error-dark', path: 'search?q=rust', scheme: 'dark', algolia: 429 },
+  { name: 'search-error-light', path: 'search?q=rust', algolia: 500 },
+  { name: 'search-mobile-light', path: 'search?q=rust', viewport: MOBILE },
+  { name: 'search-mobile-dark', path: 'search?q=rust&type=comment', scheme: 'dark', viewport: MOBILE },
+  { name: 'search-typing-dark', path: 'news', scheme: 'dark', run: (p) => p.keyboard.press('/') },
   { name: 'news-badges-light', path: 'news', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] }, '50441707': { title: 'x', url: '', lastVisit: 1, commentCount: 140, seen: [] } } },
 );
 
-const { browser, page, ext, extId, served, warnings, resetStorage, open } = await launch();
+// A scene can hold Algolia's answer (to show loading) or fail it (to show the error states).
+let algolia = null;
+const { browser, page, ext, extId, served, warnings, resetStorage, open } = await launch({
+  onRequest: async (req, url) => {
+    if (url.hostname !== 'hn.algolia.com' || algolia === null) return false;
+    if (algolia !== 'hang') await algoliaRespond(req, algolia, JSON.stringify({ message: 'error' }));
+    return true;
+  },
+});
 mkdirSync(OUT, { recursive: true });
 let failed = 0;
 for (const scene of SCENES.filter((s) => s.name.includes(FILTER))) {
@@ -104,6 +128,7 @@ for (const scene of SCENES.filter((s) => s.name.includes(FILTER))) {
   await resetStorage({ ...(scene.settings ?? {}) }, history ? { history } : {});
   await page.setViewport(scene.viewport ?? DESKTOP);
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scene.scheme ?? 'light' }]);
+  algolia = scene.algolia ?? null;
   if (scene.visitFirst) await open(scene.visitFirst);
   const mode = await open(scene.path);
   if (scene.scrollTo) await page.$eval(scene.scrollTo, (el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 70)).catch(() => {});
