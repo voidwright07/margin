@@ -54,7 +54,13 @@ function useCountdown(until: number | null): number {
  * sentinel the feed watches, and it shows what the feed is doing: loading, a Load more button after the
  * auto-load cap, a calm rate-limit notice with Retry, an error with a link to open the page normally, or the end.
  */
-export function FeedTail<T>({ control, enabled, more }: { control: FeedControl<T>; enabled: boolean; more: Href | null }) {
+export function FeedTail<T>({ control, enabled, more, service = 'Hacker News' }: {
+  control: FeedControl<T>;
+  enabled: boolean;
+  more: Href | null;
+  /** Who answers the page requests, named in the rate-limit notice. */
+  service?: string;
+}) {
   const { feed, loadMore, sentinel } = control;
   const { tail } = feed;
   const wait = useCountdown(tail.status === 'rate-limited' ? tail.retryAt : null);
@@ -96,7 +102,7 @@ export function FeedTail<T>({ control, enabled, more }: { control: FeedControl<T
     case 'rate-limited':
       body = (
         <div class="mg-feed-notice is-limited" role="status">
-          <h2>Hacker News needs a moment</h2>
+          <h2>{service} needs a moment</h2>
           <p>It is limiting how fast this browser loads pages, so Margin stopped loading. Retry in a little while, or open page {number} on its own.</p>
           <div class="mg-feed-acts">
             <button type="button" class="mg-btn" data-mg-retry disabled={wait > 0} onClick={loadMore}>

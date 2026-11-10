@@ -399,6 +399,8 @@ await check('the threadLines setting changes the rail colour', async () => {
 // ---- infinite scroll ----
 
 const toBottom = () => page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+/** The Back button, from the page itself; it reloads the document because bfcache is off. */
+const back = () => Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.evaluate(() => void setTimeout(() => history.back()))]);
 const storyIds = () => page.$$eval('#margin-root .mg-story', (els) => els.map((e) => Number(e.dataset.id)));
 const here_ = () => page.evaluate(() => location.pathname.slice(1) + location.search);
 /** The first `count` ranks after the first page divider. */
@@ -500,17 +502,17 @@ await check('Back from a story restores the added pages and the scroll offset, w
   await page.evaluate(() => (window.marginE2eMarker = 1));
   const y = await page.evaluate(() => scrollY);
   await visitStoryAndReturn(50443587);
-  await page.goBack({ waitUntil: 'load' });
+  await back();
   await page.waitForFunction(() => document.documentElement.classList.contains('mg-on'));
   await sleep(300);
-  const back = await page.evaluate(() => ({
+  const restored = await page.evaluate(() => ({
     marker: window.marginE2eMarker ?? null,
     nav: performance.getEntriesByType('navigation')[0].type,
     y: scrollY,
     url: location.pathname.slice(1) + location.search,
   }));
-  assert.deepEqual({ marker: back.marker, nav: back.nav, url: back.url }, { marker: null, nav: 'back_forward', url: 'news?p=2' }, 'a fresh document');
-  assert.ok(Math.abs(back.y - y) <= 2, `scroll offset ${back.y}, was ${y}`);
+  assert.deepEqual({ marker: restored.marker, nav: restored.nav, url: restored.url }, { marker: null, nav: 'back_forward', url: 'news?p=2' }, 'a fresh document');
+  assert.ok(Math.abs(restored.y - y) <= 2, `scroll offset ${restored.y}, was ${y}`);
   const ids = await storyIds();
   assert.equal(ids.length, 60, 'both pages are back');
   assert.equal(ids[0], 50442736, 'page one comes first');
@@ -528,7 +530,7 @@ await check('stale restore data falls back to a normal load, never a blank page'
       if (k.startsWith('margin:feed:')) sessionStorage.setItem(k, sessionStorage.getItem(k).replace(/"savedAt":\d+/, '"savedAt":1'));
     }
   });
-  await page.goBack({ waitUntil: 'load' });
+  await back();
   await page.waitForFunction(() => document.documentElement.classList.contains('mg-on'));
   const ids = await storyIds();
   assert.equal(ids[0], 50437752, 'the page in the address bar, loaded normally');
@@ -716,7 +718,7 @@ await check('typing a query fetches the correct API URL once, after the pause', 
   assert.deepEqual(algolia.map((u) => u.href), [`${API}search?query=rust&tags=story`]);
   assert.equal(await firstTitle(), 'Why Discord is switching from Go to Rust');
   assert.equal(await page.$eval('.mg-hits .mg-title mark.mg-match', (m) => m.textContent), 'Rust');
-  assert.equal(await page.$eval('.mg-search-summary span', (s) => s.textContent), '61,306 results · page 1 of 50');
+  assert.equal(await page.$eval('.mg-search-summary span', (s) => s.textContent), '61,306 results', 'no page count while scrolling loads more');
   assert.equal(await here(), 'search?q=rust', 'URL follows the query');
   assert.equal(await page.evaluate(() => history.length), before, 'typing replaces, never pushes');
 });
@@ -745,8 +747,8 @@ await check('type, sort and range change the request', async () => {
   assert.equal(algolia.length, 3);
 });
 
-await check('page 2 requests page=1, from ] and back with [', async () => {
-  await resetStorage();
+await check('with infinite scroll off, page 2 requests page=1, from ] and back with [', async () => {
+  await resetStorage({ infiniteScroll: false });
   await open('search?q=rust');
   await settled();
   await page.keyboard.press(']');
@@ -756,6 +758,7 @@ await check('page 2 requests page=1, from ] and back with [', async () => {
   assert.equal(await here(), 'search?q=rust&p=2');
   assert.equal(await page.$eval('.mg-hits .mg-rank', (r) => r.textContent), '21');
   assert.equal(await page.$eval('.mg-pager a.is-on', (a) => a.textContent), '2');
+  assert.equal(await page.$eval('.mg-search-summary span', (s) => s.textContent), '61,306 results · page 2 of 50');
   await page.keyboard.press('[');
   await page.waitForFunction(() => !location.search.includes('p=2'));
   await settled();
@@ -765,6 +768,46 @@ await check('page 2 requests page=1, from ] and back with [', async () => {
   await open('search?q=rust&p=2');
   await settled();
   assert.equal(lastRequest().searchParams.get('page'), '1', 'a shared page-2 link loads page 2');
+});
+
+await check('search appends its next page as you scroll, with continued ranks', async () => {
+  await resetStorage();
+  await open('search?q=rust');
+  await settled();
+  assert.equal(await page.$('.mg-pager'), null, 'no pager');
+  await loadNext(1);
+  assert.equal(lastRequest().href, `${API}search?query=rust&tags=story&page=1`);
+  assert.equal(algolia.length, 2);
+  assert.deepEqual(await page.$eval('.mg-page-divider a', (a) => [a.textContent, a.getAttribute('href')]), ['Page 2', 'search?q=rust&p=2']);
+  const ranks = await page.$$eval('.mg-hits .mg-rank', (r) => r.map((x) => x.textContent));
+  assert.equal(ranks.length, 40);
+  assert.deepEqual([ranks[19], ranks[20]], ['20', '21']);
+  await page.$eval('.mg-page-divider', (d) => d.scrollIntoView({ block: 'start' }));
+  await page.waitForFunction(() => location.search === '?q=rust&p=2', { timeout: 2000 });
+  const hit = await page.$eval('.mg-page-divider', (d) => d.nextElementSibling.querySelector('.mg-story').dataset.id);
+  await page.$eval(`[data-id="${hit}"]`, (el) => el.scrollIntoView({ block: 'center' }));
+  const y = await page.evaluate(() => scrollY);
+  algolia.length = 0;
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click(`[data-id="${hit}"] a[data-mg-comments]`)]);
+  await back();
+  await page.waitForFunction(() => document.querySelectorAll('.mg-hits .mg-rank').length === 40, { timeout: 4000 });
+  await sleep(200);
+  assert.ok(Math.abs((await page.evaluate(() => scrollY)) - y) <= 2, 'Back restores the scroll offset');
+  assert.equal(await page.$eval('.mg-hits .mg-rank', (r) => r.textContent), '1', 'with page one above');
+});
+
+await check('a 429 while appending search results shows Retry and waits', async () => {
+  await resetStorage();
+  await open('search?q=rust');
+  await settled();
+  algoliaStatus = 429;
+  await toBottom();
+  await page.waitForSelector('.mg-feed-notice.is-limited', { timeout: 4000 });
+  assert.equal(await page.$eval('.mg-feed-notice h2', (h) => h.textContent), 'hn.algolia.com needs a moment');
+  await toBottom();
+  await sleep(1500);
+  assert.equal(algolia.length, 2, 'one try, no automatic retry');
+  assert.equal(await page.$$eval('.mg-hits .mg-rank', (r) => r.length), 20, 'page one stays');
 });
 
 await check('/ focuses the top-bar field from any page, Enter there opens the search page, and help lists /', async () => {

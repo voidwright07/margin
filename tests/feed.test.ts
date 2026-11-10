@@ -8,6 +8,7 @@ import {
   autoLoads,
   backoff,
   beginLoad,
+  cancelLoad,
   canLoad,
   canonical,
   feedOf,
@@ -88,6 +89,14 @@ describe('feed state transitions', () => {
     expect(loading.tail).toEqual({ status: 'loading', next: 'news?p=2' });
     expect(beginLoad(loading, 0)).toBe(loading);
     expect(canLoad(loading, 0)).toBe(false);
+  });
+
+  it('a cancelled load can be started again', () => {
+    const loading = beginLoad(start(), 0);
+    const cancelled = cancelLoad(loading);
+    expect(cancelled.tail).toEqual({ status: 'idle', next: 'news?p=2' });
+    expect(settle(cancelled, h('news?p=2'), ok([2], null), 0)).toBe(cancelled);
+    expect(beginLoad(cancelled, 0).tail.status).toBe('loading');
   });
 
   it('ignores a result for a page that is not the one loading', () => {

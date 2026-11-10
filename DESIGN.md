@@ -95,6 +95,7 @@ type SearchResult = { hits: Array<StoryHit | CommentHit>; total: number; page: n
 - `src/search/match.ts` highlights terms itself. It splits text into segments at word-start matches of the query's words, and the UI wraps matches in `<mark>`. Algolia's `_highlightResult` HTML is never used.
 - `src/ui/searchState.ts` is the page's controller, shared through a context by the top-bar field and the results. Loading is a union: `idle | loading (with the previous results, shown dimmed) | ready | failed (rate-limited | http | network | bad-response)`. Results are cached per URL for the page's lifetime, so Back and `[` are instant and Algolia sees fewer requests.
 - History: typing updates the field at once, then after 300 ms replaces the current entry's URL and searches. Enter, a filter and a page link push an entry. Before pushing, the controller restores the last deliberate URL on the current entry, so Back returns to the previous search and never to a half-typed draft. `popstate` reparses the URL.
+- With `settings.infiniteScroll` on, results continue the same way story lists do (see Infinite scroll): the pager gives way to page dividers, the next page loads through `loadSearchPage`, which shares the per-URL result cache, and ranks continue from the page number. A `ready` load carries the query that produced it, so a half-typed draft never relabels the results on screen. A 429 from Algolia is the same calm rate-limit tail, naming hn.algolia.com. With the setting off, the pager and `[`/`]` paging are unchanged.
 - Story hits render through the same `StoryRow` as story lists, so they get the bookmark action, visited state and new-comment badges. Comment hits show author, age (linking to the comment), "on:" the story, and the clamped text.
 - In the original design `/search` would show HN's bare "Unknown.", so `boot.tsx` replaces the location with `toAlgoliaWeb` of the current URL instead of showing the return pill. Switching to the original design while on a search page does the same.
 - The search page hides HN's loose "Unknown." text node with the same adopt-and-restore helper passthrough pages use, and `boot.tsx` adds a mobile viewport meta when a page has none, as that 404 page does not.
@@ -102,7 +103,7 @@ type SearchResult = { hits: Array<StoryHit | CommentHit>; total: number; page: n
 
 ## Infinite scroll
 
-Every page whose `Page` is `stories` or `comments` continues at its `more` link as the reader nears the bottom. `settings.infiniteScroll` (on by default) turns it off, and then the More link is exactly as before.
+Every page whose `Page` is `stories` or `comments` continues at its `more` link as the reader nears the bottom, and the search page continues at its next result page. `settings.infiniteScroll` (on by default) turns it off, and then the More link is exactly as before.
 
 ```ts
 type FeedPage<T> = { href: Href; number: number; items: T[] }      // href is HN-relative: news?p=2

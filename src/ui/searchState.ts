@@ -1,14 +1,16 @@
 import { createContext } from 'preact';
 import { useContext, useEffect, useRef, useState } from 'preact/hooks';
 import { fetchSearch, SearchError, type SearchFailure } from '../app/search-client';
-import type { SearchQuery, SearchResult } from '../hn/types';
+import type { Outcome } from '../feed/feed';
+import type { CommentHit, Href, SearchQuery, SearchResult, StoryHit } from '../hn/types';
 import { isBlank, parseQuery, toAlgolia, toUrl } from '../search/query';
 
 /** What the results area shows. Empty results are `ready` with no hits. */
 export type Load =
   | { status: 'idle' }
   | { status: 'loading'; stale: SearchResult | null }
-  | { status: 'ready'; result: SearchResult }
+  /** `query` is the search that produced `result`; the field may already hold a newer draft. */
+  | { status: 'ready'; result: SearchResult; query: SearchQuery }
   | { status: 'failed'; failure: SearchFailure; message: string };
 
 export type Search = {
@@ -28,6 +30,30 @@ export const useSearch = () => useContext(SearchContext);
 const DEBOUNCE_MS = 300;
 const here = () => location.pathname.slice(1) + location.search;
 const results = new Map<string, SearchResult>();
+
+/** The page after `r`, as infinite scroll continues it. */
+export const searchNext = (q: SearchQuery, r: SearchResult): Href | null => (r.page < r.pages ? toUrl({ ...q, page: r.page + 1 }) : null);
+
+/**
+ * One more page of results for infinite scroll, through the same cache as the page itself. `href` is Margin's
+ * own `search?…` URL for that page.
+ */
+export const loadSearchPage = async (href: Href, signal: AbortSignal): Promise<Outcome<StoryHit | CommentHit>> => {
+  const q = parseQuery(new URL(href, location.href).searchParams);
+  const key = toUrl(q);
+  let result = results.get(key);
+  if (!result) {
+    try {
+      result = await fetchSearch(toAlgolia(q, Math.floor(Date.now() / 1000)), signal);
+    } catch (e) {
+      if (signal.aborted) throw e;
+      if (e instanceof SearchError && e.failure === 'rate-limited') return { type: 'rate-limited' };
+      return { type: 'error', message: e instanceof Error ? e.message : String(e) };
+    }
+    results.set(key, result);
+  }
+  return { type: 'page', items: result.hits, next: searchNext(q, result) };
+};
 
 /**
  * History model: `committed` is the URL of the last entry the user deliberately made. Typing replaces the
@@ -53,7 +79,7 @@ export function useSearchController(initial: SearchQuery): Search {
     if (isBlank(q)) return setLoad({ status: 'idle' });
     const key = toUrl(q);
     const cached = fresh ? undefined : results.get(key);
-    if (cached) return setLoad({ status: 'ready', result: cached });
+    if (cached) return setLoad({ status: 'ready', result: cached, query: q });
     const ctrl = new AbortController();
     inflight.current = ctrl;
     setLoad((prev) => ({ status: 'loading', stale: prev.status === 'ready' ? prev.result : prev.status === 'loading' ? prev.stale : null }));
@@ -61,7 +87,7 @@ export function useSearchController(initial: SearchQuery): Search {
       (result) => {
         if (ctrl.signal.aborted) return;
         results.set(key, result);
-        setLoad({ status: 'ready', result });
+        setLoad({ status: 'ready', result, query: q });
       },
       (e: unknown) => {
         if (ctrl.signal.aborted) return;

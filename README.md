@@ -23,7 +23,7 @@ Every feature is free. There is no account, no paid tier and no tracking.
 
 - Six themes (system, light, classic, slate, dark, black), three font families, and settings for text size, line height, column width and justified text. Settings also choose the list view, new-tab links, keyboard shortcuts, thread line colours and infinite scroll.
 - Story lists in list, table (choose the columns) or compact view, on every page: page 2 and beyond, `newest?next=…`, past front pages, Ask, Show, Jobs, Best, `from?site=`, submissions and favorites.
-- Infinite scroll on story and comment lists: the next page loads as you near the bottom, under a "Page N" divider that links to that page. The address bar follows the page you are reading, and the Back button returns to the same spot with every loaded page. It stops after ten pages for a Load more button, waits politely when HN rate-limits, and can be turned off in settings to get HN's More link back.
+- Infinite scroll on story lists, comment lists and search results: the next page loads as you near the bottom, under a "Page N" divider that links to that page. The address bar follows the page you are reading, and the Back button returns to the same spot with every loaded page. It stops after ten pages for a Load more button, waits politely when HN rate-limits, and can be turned off in settings to get HN's More link back.
 - A date picker for the front page of any past day.
 - One click back to the original design, and one click to return.
 
@@ -46,7 +46,7 @@ Every feature is free. There is no account, no paid tier and no tracking.
 
 **Tools**
 
-- Search from the top bar (press `/`). Search stories, comments, Ask HN, Show HN or jobs, sorted by popularity or date, over any time range, with matches marked.
+- Search from the top bar (press `/`). Search stories, comments, Ask HN, Show HN or jobs, sorted by popularity or date, over any time range, with matches marked. Results keep loading as you scroll, or page by page with infinite scroll off.
 - Profile cards when you hover a username, with karma, account age and about text.
 - A selection menu on selected text: highlight, quote into your reply, copy, read aloud, or search HN.
 - Every account action: vote, unvote, downvote, hide, favorite, flag, edit and delete.

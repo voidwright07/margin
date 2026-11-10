@@ -1,5 +1,5 @@
-import type { ComponentChildren } from 'preact';
-import { useEffect, useMemo } from 'preact/hooks';
+import { Fragment, type ComponentChildren } from 'preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { CommentHit, Href, SearchQuery, SearchRange, SearchResult, SearchSort, SearchType, Story, StoryHit } from '../hn/types';
 import { excerptAt, searchTerms } from '../search/match';
 import { isBlank, pageWindow, toAlgoliaWeb, toUrl } from '../search/query';
@@ -9,8 +9,10 @@ import { ago, plural, UserLink } from './common';
 import { IconChevronLeft, IconChevronRight, IconClose, IconComment, IconSearch } from './icons';
 import { focusSearch } from './keyboard';
 import { Marked } from './Marked';
-import { useSearch, type Load, type Search } from './searchState';
+import { FeedTail, PageMark } from './Feed';
+import { loadSearchPage, searchNext, useSearch, type Load, type Search } from './searchState';
 import { StoryRow } from './StoryIndex';
+import { useFeed } from './useFeed';
 
 const HITS_PER_PAGE = 20;
 
@@ -141,10 +143,11 @@ function Filters({ s }: { s: Search }) {
 const shown = (load: Load): SearchResult | null => (load.status === 'ready' ? load.result : load.status === 'loading' ? load.stale : null);
 
 function Summary({ s }: { s: Search }) {
+  const infinite = useStore((st) => st.settings.infiniteScroll);
   const result = shown(s.load);
   let text = '';
   if (s.load.status === 'loading') text = 'Searching…';
-  else if (result) text = plural(result.total, 'result') + (result.pages > 1 ? ` · page ${result.page} of ${result.pages}` : '');
+  else if (result) text = plural(result.total, 'result') + (result.pages > 1 && !infinite ? ` · page ${result.page} of ${result.pages}` : '');
   return (
     <div class="mg-search-summary">
       <span aria-live="polite">{text}</span>
@@ -212,13 +215,14 @@ function CommentHitRow({ hit, terms, rank }: { hit: CommentHit; terms: string[];
   );
 }
 
-function Hits({ result, terms, stale }: { result: SearchResult; terms: string[]; stale: boolean }) {
+/** One page of results; `page` (1-based) numbers the rows. */
+function Hits({ hits, page, terms, stale }: { hits: Array<StoryHit | CommentHit>; page: number; terms: string[]; stale: boolean }) {
   const newTab = useStore((st) => st.settings.openLinksInNewTab);
   const history = useStore((st) => st.history);
-  const offset = (result.page - 1) * HITS_PER_PAGE;
+  const offset = (page - 1) * HITS_PER_PAGE;
   return (
     <ol class={`mg-stories mg-hits${stale ? ' is-stale' : ''}`} aria-busy={stale}>
-      {result.hits.map((hit, i) =>
+      {hits.map((hit, i) =>
         hit.type === 'story' ? (
           <StoryRow story={hitStory(hit, offset + i + 1)} newTab={newTab} entry={history[hit.id]} onHidden={() => {}} terms={terms}>
             {hit.text && (
@@ -338,6 +342,7 @@ function Pager({ s, result }: { s: Search; result: SearchResult }) {
 
 function Results({ s }: { s: Search }) {
   const terms = useMemo(() => searchTerms(s.query.q), [s.query.q]);
+  const infinite = useStore((st) => st.settings.infiniteScroll);
   const { load } = s;
   switch (load.status) {
     case 'idle':
@@ -345,17 +350,34 @@ function Results({ s }: { s: Search }) {
     case 'failed':
       return <Failed s={s} load={load} />;
     case 'loading':
-      return load.stale ? <Hits result={load.stale} terms={terms} stale /> : <Skeleton />;
+      return load.stale ? <Hits hits={load.stale.hits} page={load.stale.page} terms={terms} stale /> : <Skeleton />;
     case 'ready':
-      return load.result.hits.length === 0 ? (
-        <Empty s={s} />
-      ) : (
+      if (load.result.hits.length === 0) return <Empty s={s} />;
+      if (infinite) return <ResultFeed key={toUrl(load.query)} query={load.query} result={load.result} terms={terms} />;
+      return (
         <>
-          <Hits result={load.result} terms={terms} stale={false} />
+          <Hits hits={load.result.hits} page={load.result.page} terms={terms} stale={false} />
           <Pager s={s} result={load.result} />
         </>
       );
   }
+}
+
+/** Results with infinite scroll: later pages append under dividers, through the same cache as the pager. */
+function ResultFeed({ query, result, terms }: { query: SearchQuery; result: SearchResult; terms: string[] }) {
+  const [first] = useState(() => ({ href: toUrl(query), number: result.page, items: result.hits }));
+  const control = useFeed('search', true, first, searchNext(query, result), loadSearchPage);
+  return (
+    <>
+      {control.feed.pages.map((p, i) => (
+        <Fragment key={p.href}>
+          <PageMark page={p} index={i} />
+          <Hits hits={p.items} page={p.number} terms={terms} stale={false} />
+        </Fragment>
+      ))}
+      <FeedTail control={control} enabled more={null} service="hn.algolia.com" />
+    </>
+  );
 }
 
 /** HN's "Unknown." text sits loose in <body>; tuck it away, and give it back if the original design returns. */
