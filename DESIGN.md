@@ -100,6 +100,30 @@ type SearchResult = { hits: Array<StoryHit | CommentHit>; total: number; page: n
 - The search page hides HN's loose "Unknown." text node with the same adopt-and-restore helper passthrough pages use, and `boot.tsx` adds a mobile viewport meta when a page has none, as that 404 page does not.
 - Entry points: the top-bar field on every page (`/`), the selection popup's Search HN, "Search <name>'s posts" on a profile (`author=` with type All), and "Search <site>" on HN's own `from?site=` page. Domain links on story rows still open `from?site=`, which HN serves and Margin already redesigns.
 
+## Infinite scroll
+
+Every page whose `Page` is `stories` or `comments` continues at its `more` link as the reader nears the bottom. `settings.infiniteScroll` (on by default) turns it off, and then the More link is exactly as before.
+
+```ts
+type FeedPage<T> = { href: Href; number: number; items: T[] }      // href is HN-relative: news?p=2
+type Tail =
+  | { status: 'idle'; next: Href } | { status: 'loading'; next: Href }
+  | { status: 'error'; next: Href; message: string }
+  | { status: 'rate-limited'; next: Href; retryAt: number }
+  | { status: 'end' }                                                // no next: an ended feed holds no link
+type Feed<T> = { pages: FeedPage<T>[]; tail: Tail; strikes: number /* rate limits in a row */ }
+type Outcome<T> = { type: 'page'; items: T[]; next: Href | null } | { type: 'rate-limited' } | { type: 'error'; message: string }
+```
+
+- `src/feed/feed.ts` holds the transitions, all pure: `beginLoad` (a no-op unless a load is allowed, so a second trigger never starts a second request), `settle` (applies an `Outcome` only to the load in flight), `autoLoads` and `canLoad`. Merging drops items whose id is already shown, because `news` and `newest` shift while the reader scrolls; a repeated comment takes its deeper replies with it. A `next` link that points at a page already shown ends the feed.
+- `readListPage` in `src/app/hn-client.ts` reads a fetched page with the same registry as a page load. HN's throttle page ("Sorry, we're not able to serve your requests this quickly."), a 503 and a 429 are `rate-limited`. Any other failure, or a page of another shape, is an `error`: the tail shows "Page N could not be shown here" with a link that opens the page normally.
+- Politeness. Nothing loads until the reader scrolls (or presses `j` past the end), so opening a page costs HN one request. An IntersectionObserver with a 1200 px bottom margin starts one load at a time, at least a second apart, and never while the tab is hidden. A rate limit stops auto-loading; Retry is disabled for 5 s, doubling with each limit in a row up to 60 s, and nothing retries on its own. After ten pages loaded without asking, a "Load more" button takes over.
+- Each added page starts with a divider, "Page N", linking to that page's own URL. Page one gets an invisible marker. Ranks are HN's own numbers, so a deduped page can skip a rank. Hidden stories are filtered when rendering and stay in the feed, so ranks and the dedupe of later pages do not change.
+- The address bar follows the page in view (the last marker in the top third of the screen) through `history.replaceState`, so no history entries are added and a copied URL opens that page.
+- Back. `src/feed/session.ts` gives each history entry an id in `history.state` and saves the entry's feed and scroll offset to `sessionStorage` after each page and on `pagehide` (the six most recent entries). When the document is loaded by Back or Forward (`PerformanceNavigationTiming.type === 'back_forward'`, meaning bfcache did not keep it), `parseSnapshot` in `src/feed/restore.ts` validates the saved JSON: the same version and kind of list, saved in the last 30 minutes, with well-formed items, and holding the URL in the address bar among its pages. A valid snapshot renders every saved page and restores the offset, with items on the freshly loaded page taking its current data. Anything else is a normal load of the URL in the address bar.
+- Keys. `j` past the last item asks for the next page. `]` and `[` jump to the next and previous page marker and focus its first row; past the last marker `]` loads more, and above the first `[` keeps its old meaning. Votes, hide, bookmarks, hover cards, new-reply badges and the selection popup need nothing extra: they live on each row or listen on the document.
+- `src/ui/useFeed.ts` is the only effectful part: fetching, the observer, the scroll listener, the address bar and saving. `src/ui/Feed.tsx` renders the markers and the tail (the sentinel the observer watches).
+
 ## Persistent state
 
 `src/store/` holds a single versioned schema in `chrome.storage.local`, with `{ version, settings, history, bookmarks, highlights }`. Backup exports exactly this JSON. Restore validates it at the boundary and migrates by version.
@@ -146,10 +170,10 @@ Free: themes, fonts, styles (width, line height, justify), history page/panel, i
 
 Pro (free here): bookmarks (stories, comments, users) and a bookmarks panel; highlighter; new-reply badges on story rows plus jumping between new comments; user hover card (reuses the user parser on a same-origin `user?id=` fetch, cached, 400 ms hover delay); selection popup (highlight, quote into reply, copy, speak via `speechSynthesis`, search HN on Margin's search page); control pad with keyboard shortcuts (`j/k` move, `Shift+J`/`Shift+K` next/prev top-level comment, `h` parent, `r` thread root, `n/p` next/prev new comment, `R` reply, `[`/`]` page, `o` open, `c` comments, `u` upvote, `b` bookmark, `x` collapse, `/` search, `?` help); date picker for `front?day=`; backup and restore as JSON.
 
-Beyond ModernHN: every list and comment page in its paginated forms, plus `item?id=…&p=N` comment pagination, and native search in the top bar with type, sort and date filters.
+Beyond ModernHN: every list and comment page in its paginated forms, plus `item?id=…&p=N` comment pagination, infinite scroll on story and comment lists that survives the Back button, and native search in the top bar with type, sort and date filters.
 
 ## Verification
 
 - `pnpm test`: the fixture suite in `fixtures/` (real HN HTML, captured 2026-11-10). Every fixture must route to its expected `kind` and parse non-empty, correct data. A table in the test maps each fixture to its kind. `fixtures/synthetic/` holds labelled synthetic pages for states the capture lacks; `item-deep.html` (a thread ten levels deep, with quotes and a `<pre>` block) is generated by `scripts/synthetic-deep.mjs`.
-- `pnpm e2e` (`scripts/e2e.mjs`): headless behaviour checks on the built extension against fixtures, asserting the exact requests sent for votes, favorites and replies, plus keys, history, highlights and the old-design toggle. The harness answers `hn.algolia.com/api/v1` from `fixtures/algolia/` (real responses captured 2026-11-10) with the CORS header the real API sends, and serves `/search` under a strict page CSP. The search checks assert the exact API URLs for typing, filters and pages, history push and Back, `/`, the selection popup and the 429 state.
+- `pnpm e2e` (`scripts/e2e.mjs`): headless behaviour checks on the built extension against fixtures, asserting the exact requests sent for votes, favorites and replies, plus keys, history, highlights and the old-design toggle. The harness answers `hn.algolia.com/api/v1` from `fixtures/algolia/` (real responses captured 2026-11-10) with the CORS header the real API sends, and serves `/search` under a strict page CSP. The search checks assert the exact API URLs for typing, filters and pages, history push and Back, `/`, the selection popup and the 429 state. The infinite-scroll checks assert the exact HN pages fetched (one More link per load, none before a scroll, none while hidden or rate-limited), dedupe, ranks, the address bar, `j`, `[`/`]`, the ten-page cap and Back restore. The e2e browser runs with bfcache off, so Back always reloads and restore is proven without it. `scripts/synthetic-feed.mjs` writes the synthetic shifted page two and throttle page, and the harness serves synthetic `news?p=3` and beyond from the same module.
 - Visual check: a headless Puppeteer script (Chrome for Testing, `headless: true`, extension loaded) serves fixtures through request interception for `news.ycombinator.com` and writes screenshots to a scratch directory for review. **It must never open a visible window** (the user's standing rule). Keep live requests to HN at a minimum, because HN rate-limits.

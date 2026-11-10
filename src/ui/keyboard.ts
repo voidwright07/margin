@@ -31,10 +31,14 @@ const current = (): HTMLElement | null => {
   return focused;
 };
 
+/** Dispatched on `document` when `j` moves past the last item; an infinite-scroll list loads its next page. */
+export const FEED_MORE_EVENT = 'margin:feed-more';
+
 export const move = (delta: 1 | -1) => {
   const items = navItems();
   if (items.length === 0) return;
   const at = current() ? items.indexOf(current()!) : -1;
+  if (delta === 1 && at === items.length - 1) document.dispatchEvent(new CustomEvent(FEED_MORE_EVENT));
   if (at === -1) {
     // Start from the first row on screen rather than the top of the page.
     const visible = items.find((el) => el.getBoundingClientRect().bottom > 80) ?? items[0]!;
@@ -71,6 +75,33 @@ export const threadJump = (move: ThreadMove) => {
   }
   const target = navTarget(depths, at, move);
   if (target !== null) focusRow(rows[target]!);
+};
+
+/** Page markers of an infinite-scroll list: an invisible one where the list starts, then one per added page. */
+const PAGE_MARK = '#margin-root [data-mg-page]';
+/** How far a marker is from where a jump leaves it (its scroll-margin, below the sticky top bar). */
+const offTop = (m: HTMLElement) => m.getBoundingClientRect().top - (parseFloat(getComputedStyle(m).scrollMarginTop) || 0);
+
+/**
+ * `]` and `[` on an infinite-scroll list jump to the next or previous page marker and focus its first row. Past
+ * the last marker `]` asks for the next page; above the first, `[` keeps its classic meaning.
+ */
+const pageJump = (delta: 1 | -1): boolean => {
+  const marks = Array.from(document.querySelectorAll<HTMLElement>(PAGE_MARK));
+  const target =
+    delta === 1
+      ? marks.slice(1).find((m) => offTop(m) > 2)
+      : [...marks].reverse().find((m) => offTop(m) < -2);
+  if (!target) return false;
+  target.scrollIntoView({ block: 'start' });
+  const rows = navItems();
+  const first = rows.find((r) => target.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING);
+  if (first) {
+    focused?.removeAttribute(FOCUS);
+    focused = first;
+    first.setAttribute(FOCUS, '');
+  }
+  return true;
 };
 
 const clickIn = (selector: string) => {
@@ -113,8 +144,8 @@ export const COMMANDS: Command[] = [
   { keys: ['b'], label: 'Bookmark', run: () => clickIn('[data-mg-bookmark]') },
   { keys: ['x'], label: 'Collapse or expand thread', run: () => clickIn('[data-mg-collapse]') },
   { keys: ['R'], label: 'Reply to the comment', run: () => clickIn('[data-mg-reply]') },
-  { keys: [']'], label: 'Next page', run: () => void clickPage('[data-mg-next]', '[data-mg-nextday]') },
-  { keys: ['['], label: 'Previous page', run: () => void (clickPage('[data-mg-prev]') || history.back()) },
+  { keys: [']'], label: 'Next page', run: () => void (pageJump(1) || clickPage('[data-mg-next]', '[data-mg-nextday]')) },
+  { keys: ['['], label: 'Previous page', run: () => void (pageJump(-1) || clickPage('[data-mg-prev]') || history.back()) },
   { keys: ['/'], label: 'Search', run: focusSearch },
   { keys: ['g'], label: 'Back to top', run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
   { keys: ['l'], label: 'Open the library', run: () => setPanel(getPanel() === 'library' ? null : 'library') },

@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import puppeteer from 'puppeteer-core';
+import { syntheticNewsPage } from './synthetic-feed.mjs';
 
 export const ROOT = resolve(import.meta.dirname, '..');
 export const EXT = join(ROOT, '.output', 'chrome-mv3');
@@ -86,9 +87,10 @@ const STRICT_CSP = { 'content-security-policy': "default-src 'self'; script-src 
 
 /**
  * Launch the browser. `onRequest(req, url)` may answer a request itself (return true) before the fixture
- * router runs; tests use it to observe action and reply requests.
+ * router runs; tests use it to observe action and reply requests. `bfcache: false` makes Back reload the
+ * document, so a check can prove what the page restores on its own.
  */
-export const launch = async ({ onRequest } = {}) => {
+export const launch = async ({ onRequest, bfcache = true } = {}) => {
   if (!existsSync(join(EXT, 'manifest.json'))) throw new Error('Build first: pnpm build:chrome');
   const browser = await puppeteer.launch({
     executablePath: findChrome(),
@@ -96,7 +98,14 @@ export const launch = async ({ onRequest } = {}) => {
     pipe: true,
     enableExtensions: true,
     // Every host fails DNS, so a request that escapes interception (a new tab, a service worker) cannot go live.
-    args: ['--no-first-run', '--no-default-browser-check', '--disable-gpu', '--renderer-process-limit=2', '--host-resolver-rules=MAP * ~NOTFOUND'],
+    args: [
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-gpu',
+      '--renderer-process-limit=2',
+      '--host-resolver-rules=MAP * ~NOTFOUND',
+      ...(bfcache ? [] : ['--disable-features=BackForwardCache']),
+    ],
   });
   const extId = await browser.installExtension(EXT);
   const served = { fixture: 0, algolia: 0, stub: 0, external: 0, popups: [] };
@@ -145,6 +154,12 @@ export const launch = async ({ onRequest } = {}) => {
     if (file) {
       served.fixture++;
       return req.respond({ status: 200, contentType: 'text/html; charset=utf-8', body: fixture(file) });
+    }
+    // Synthetic pages three and beyond, so infinite scroll can run past the capture (scripts/synthetic-feed.mjs).
+    const deep = Number(key.match(/^news\?p=(\d+)$/)?.[1]);
+    if (deep >= 3 && deep <= 20) {
+      served.fixture++;
+      return req.respond({ status: 200, contentType: 'text/html; charset=utf-8', body: syntheticNewsPage(deep) });
     }
     served.stub++;
     const p = url.pathname;

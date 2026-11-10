@@ -123,3 +123,7 @@ export const settle = <T extends Keyed>(feed: Feed<T>, href: Href, outcome: Outc
       return { ...feed, tail: { status: 'error', next: href, message: outcome.message } };
   }
 };
+
+/** Abandon the load in flight (the list unmounted or the setting went off); the page can be loaded again later. */
+export const cancelLoad = <T>(feed: Feed<T>): Feed<T> =>
+  feed.tail.status === 'loading' ? { ...feed, tail: { status: 'idle', next: feed.tail.next } } : feed;

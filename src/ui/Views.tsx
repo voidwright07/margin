@@ -1,9 +1,13 @@
+import { Fragment } from 'preact';
 import type { Page } from '../hn/types';
 import { DEFAULT_QUERY, toUrl } from '../search/query';
 import { userBookmark } from '../store/ops';
+import { useStore } from '../store/store';
 import { Adopt } from './Adopt';
-import { BookmarkButton, MoreLink, PageHead, plural, profileTabFor, ProfileTabs } from './common';
+import { BookmarkButton, PageHead, plural, profileTabFor, ProfileTabs } from './common';
+import { FeedTail, PageMark } from './Feed';
 import { Thread } from './Thread';
+import { useListFeed } from './useFeed';
 
 type CommentsPage = Extract<Page, { kind: 'comments' }>;
 type UserPage = Extract<Page, { kind: 'user' }>;
@@ -16,6 +20,9 @@ const COMMENT_TITLES: Partial<Record<NonNullable<CommentsPage['meta']['section']
 };
 
 export function CommentListing({ page }: { page: CommentsPage }) {
+  const enabled = useStore((s) => s.settings.infiniteScroll);
+  const control = useListFeed('comments', enabled, page.meta, page.comments, page.more);
+  const pages = enabled ? control.feed.pages : control.feed.pages.slice(0, 1);
   const profile = profileTabFor(page.meta);
   const title = page.meta.section ? COMMENT_TITLES[page.meta.section] : undefined;
   return (
@@ -33,12 +40,17 @@ export function CommentListing({ page }: { page: CommentsPage }) {
         </nav>
       )}
       {title && <PageHead title={title} />}
-      {page.comments.length === 0 ? (
+      {page.comments.length === 0 && pages.length === 1 ? (
         <p class="mg-empty">No comments here yet.</p>
       ) : (
-        <Thread comments={page.comments} op={null} newIds={NO_NEW} showStory onPosted={null} itemId={null} />
+        pages.map((p, i) => (
+          <Fragment key={p.href}>
+            {enabled && <PageMark page={p} index={i} />}
+            <Thread comments={p.items} op={null} newIds={NO_NEW} showStory onPosted={null} itemId={null} />
+          </Fragment>
+        ))
       )}
-      <MoreLink href={page.more} />
+      <FeedTail control={control} enabled={enabled} more={page.more} />
     </div>
   );
 }

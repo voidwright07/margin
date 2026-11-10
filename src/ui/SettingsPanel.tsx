@@ -124,6 +124,7 @@ export function SettingsPanel({ showOriginalToggle = true }: { showOriginalToggl
           </div>
         )}
         <Toggle label="Open story links in a new tab" checked={s.openLinksInNewTab} onChange={(openLinksInNewTab) => set({ openLinksInNewTab })} />
+        <Toggle label="Load more as you scroll" hint="Off shows HN's More link" checked={s.infiniteScroll} onChange={(infiniteScroll) => set({ infiniteScroll })} />
         <Toggle label="Keyboard shortcuts" hint="Press ? for the list" checked={s.keyboard} onChange={(keyboard) => set({ keyboard })} />
       </section>
       {showOriginalToggle && (

@@ -1,7 +1,7 @@
 // Headless behaviour checks for the built Chrome extension. Each check drives the real content script on a
 // fixture page and asserts an observable effect: DOM, storage, or the exact request sent to HN.
 //
-//   pnpm build:chrome && node scripts/e2e.mjs
+//   pnpm build:chrome && node scripts/e2e.mjs [nameFilter]
 
 import assert from 'node:assert/strict';
 import { algoliaRespond, HN, launch, sleep } from './harness.mjs';
@@ -10,8 +10,14 @@ const requests = [];
 const algolia = [];
 let algoliaStatus = 200;
 let replyResponse = null;
+/** Pages the content script fetched from HN (infinite scroll), as `path?query`. */
+const fetches = [];
+/** Per-check answers for HN paths: `{ status, body }`, served instead of the fixture router. */
+const overrides = new Map();
 
+// Back always reloads the document here, so the restore checks prove the page restores itself without bfcache.
 const { browser, page, resetStorage, readStorage, open, fixture, warnings } = await launch({
+  bfcache: false,
   onRequest: async (req, url) => {
     if (url.hostname === 'hn.algolia.com') {
       algolia.push(url);
@@ -21,6 +27,12 @@ const { browser, page, resetStorage, readStorage, open, fixture, warnings } = aw
     }
     if (url.hostname !== 'news.ycombinator.com') return false;
     const key = url.pathname.slice(1) + url.search;
+    if (req.resourceType() === 'fetch' && !/^(vote|fave|hide|flag|reply|comment|user)\b/.test(key)) fetches.push(key);
+    const override = overrides.get(key);
+    if (override) {
+      await req.respond({ status: override.status ?? 200, contentType: 'text/html; charset=utf-8', body: override.body });
+      return true;
+    }
     if (/^(vote|fave|hide|flag)\?/.test(key)) {
       requests.push({ method: req.method(), key });
       await req.respond({ status: 200, contentType: 'text/html', body: '<html><body>ok</body></html>' });
@@ -42,10 +54,14 @@ const { browser, page, resetStorage, readStorage, open, fixture, warnings } = aw
 });
 
 const results = [];
+const ONLY = process.argv[2] ?? '';
 const check = async (name, fn) => {
+  if (!name.includes(ONLY)) return;
   requests.length = 0;
   algolia.length = 0;
   algoliaStatus = 200;
+  fetches.length = 0;
+  overrides.clear();
   try {
     await fn();
     results.push(['ok', name]);
@@ -378,6 +394,306 @@ await check('the threadLines setting changes the rail colour', async () => {
     colours[threadLines] = await rail();
   }
   assert.equal(new Set(Object.values(colours)).size, 3, JSON.stringify(colours));
+});
+
+// ---- infinite scroll ----
+
+const toBottom = () => page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+const storyIds = () => page.$$eval('#margin-root .mg-story', (els) => els.map((e) => Number(e.dataset.id)));
+const here_ = () => page.evaluate(() => location.pathname.slice(1) + location.search);
+/** The first `count` ranks after the first page divider. */
+const ranksAfterDivider = (count) =>
+  page.evaluate((n) => {
+    const divider = document.querySelector('.mg-page-divider');
+    return [...document.querySelectorAll('.mg-story')]
+      .filter((s) => divider.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .slice(0, n)
+      .map((s) => s.querySelector('.mg-rank').textContent);
+  }, count);
+/** Scroll to the bottom and wait until `count` page dividers show. */
+const loadNext = async (count) => {
+  await toBottom();
+  await page.waitForFunction((n) => document.querySelectorAll('.mg-page-divider').length >= n, { timeout: 4000 }, count);
+};
+/** news?p=2 as HN serves it to a logged-in reader: vote and hide links carry an auth token. */
+const loggedInP2 = () =>
+  fixture('news-p2.html')
+    .toString()
+    .replace(/how=up&amp;goto/g, 'how=up&amp;auth=t1&amp;goto')
+    .replace(/(hide\?id=\d+)&amp;goto/g, '$1&amp;auth=t2&amp;goto');
+/** Open a story from page two, then come back with the Back button. */
+const visitStoryAndReturn = async (id) => {
+  await page.$eval(`[data-id="${id}"]`, (el) => el.scrollIntoView({ block: 'center' }));
+  await page.waitForFunction(() => location.search === '?p=2', { timeout: 2000 });
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click(`[data-id="${id}"] .mg-meta a[href^="item?id="]`)]);
+};
+
+await check('scrolling to the bottom fetches the More link once and continues with page two', async () => {
+  await resetStorage();
+  await open('news');
+  await sleep(400);
+  assert.deepEqual(fetches, [], 'opening a page fetches nothing');
+  await loadNext(1);
+  await sleep(1500);
+  assert.deepEqual(fetches, ['news?p=2'], 'exactly the More link, once');
+  const ids = await storyIds();
+  assert.equal(ids.length, 60);
+  assert.equal(ids[0], 50442736);
+  assert.equal(ids[30], 50437752, 'page two follows page one');
+  assert.deepEqual(await ranksAfterDivider(3), ['31', '32', '33'], "HN's own ranks continue");
+  assert.deepEqual(await page.$eval('.mg-page-divider a', (a) => [a.textContent, a.getAttribute('href')]), ['Page 2', 'news?p=2']);
+  assert.equal(await page.$('.mg-more'), null, 'no classic More link');
+});
+
+await check('the address bar follows the page in view without adding history entries', async () => {
+  await resetStorage();
+  await open('news');
+  const length = await page.evaluate(() => history.length);
+  await loadNext(1);
+  await page.$eval('.mg-page-divider', (d) => d.scrollIntoView({ block: 'start' }));
+  await page.waitForFunction(() => location.search === '?p=2', { timeout: 2000 });
+  assert.equal(await here_(), 'news?p=2');
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.waitForFunction(() => location.search === '', { timeout: 2000 });
+  assert.equal(await here_(), 'news');
+  assert.equal(await page.evaluate(() => history.length), length, 'replaced, never pushed');
+});
+
+await check('a hidden tab does not fetch; showing it again does', async () => {
+  // Compact rows are short, so after page two the bottom is still close and page three would follow.
+  await resetStorage({ indexView: 'compact' });
+  await open('news');
+  await loadNext(1);
+  const other = await browser.newPage();
+  try {
+    await other.bringToFront();
+    await page.waitForFunction(() => document.hidden, { timeout: 2000 });
+    await page.evaluate(() => scrollBy(0, 200));
+    await sleep(2000);
+    assert.deepEqual(fetches, ['news?p=2'], 'nothing while hidden');
+  } finally {
+    await other.close();
+    await page.bringToFront();
+  }
+  await page.waitForFunction(() => !document.hidden, { timeout: 2000 });
+  await loadNext(2);
+  assert.deepEqual(fetches, ['news?p=2', 'news?p=3']);
+});
+
+await check('a next page that overlaps what is shown never repeats a story', async () => {
+  await resetStorage();
+  overrides.set('news?p=2', { body: fixture('synthetic/news-p2-shifted.html') });
+  await open('news');
+  await loadNext(1);
+  const ids = await storyIds();
+  assert.equal(new Set(ids).size, ids.length, 'no duplicates');
+  assert.equal(ids.length, 57, 'the three stories that slid onto page two are dropped');
+  assert.deepEqual(await ranksAfterDivider(2), ['34', '35']);
+});
+
+await check('Back from a story restores the added pages and the scroll offset, without bfcache', async () => {
+  await resetStorage();
+  await open('news');
+  await loadNext(1);
+  await page.$eval('[data-id="50443587"]', (el) => el.scrollIntoView({ block: 'center' }));
+  await page.waitForFunction(() => location.search === '?p=2', { timeout: 2000 });
+  await page.evaluate(() => (window.marginE2eMarker = 1));
+  const y = await page.evaluate(() => scrollY);
+  await visitStoryAndReturn(50443587);
+  await page.goBack({ waitUntil: 'load' });
+  await page.waitForFunction(() => document.documentElement.classList.contains('mg-on'));
+  await sleep(300);
+  const back = await page.evaluate(() => ({
+    marker: window.marginE2eMarker ?? null,
+    nav: performance.getEntriesByType('navigation')[0].type,
+    y: scrollY,
+    url: location.pathname.slice(1) + location.search,
+  }));
+  assert.deepEqual({ marker: back.marker, nav: back.nav, url: back.url }, { marker: null, nav: 'back_forward', url: 'news?p=2' }, 'a fresh document');
+  assert.ok(Math.abs(back.y - y) <= 2, `scroll offset ${back.y}, was ${y}`);
+  const ids = await storyIds();
+  assert.equal(ids.length, 60, 'both pages are back');
+  assert.equal(ids[0], 50442736, 'page one comes first');
+  assert.equal(await page.$$eval('.mg-page-divider', (d) => d.length), 1);
+  assert.deepEqual(fetches, ['news?p=2'], 'restored from the tab, not refetched');
+});
+
+await check('stale restore data falls back to a normal load, never a blank page', async () => {
+  await resetStorage();
+  await open('news');
+  await loadNext(1);
+  await visitStoryAndReturn(50443587);
+  await page.evaluate(() => {
+    for (const k of Object.keys(sessionStorage)) {
+      if (k.startsWith('margin:feed:')) sessionStorage.setItem(k, sessionStorage.getItem(k).replace(/"savedAt":\d+/, '"savedAt":1'));
+    }
+  });
+  await page.goBack({ waitUntil: 'load' });
+  await page.waitForFunction(() => document.documentElement.classList.contains('mg-on'));
+  const ids = await storyIds();
+  assert.equal(ids[0], 50437752, 'the page in the address bar, loaded normally');
+  assert.equal(ids.includes(50442736), false, 'page one is not restored');
+  assert.equal(await page.$eval('.mg-story .mg-rank', (r) => r.textContent), '31');
+});
+
+await check('a rate-limited page shows Retry, backs off, and never refetches on its own', async () => {
+  await resetStorage();
+  overrides.set('news?p=2', { body: fixture('synthetic/rate-limited.html') });
+  await open('news');
+  await toBottom();
+  await page.waitForSelector('.mg-feed-notice.is-limited', { timeout: 4000 });
+  assert.equal(await page.$eval('.mg-feed-notice h2', (h) => h.textContent), 'Hacker News needs a moment');
+  assert.equal(await page.$eval('[data-mg-retry]', (b) => b.disabled), true, 'Retry waits');
+  assert.match(await page.$eval('[data-mg-retry]', (b) => b.textContent), /^Retry in \ds$/);
+  assert.equal(await page.$eval('.mg-feed-notice a', (a) => a.getAttribute('href')), 'news?p=2');
+  for (let i = 0; i < 4; i++) {
+    await page.evaluate(() => scrollBy(0, -400));
+    await sleep(250);
+    await toBottom();
+    await sleep(250);
+  }
+  await page.keyboard.press('j');
+  await sleep(1500);
+  assert.deepEqual(fetches, ['news?p=2'], 'no refetch while rate-limited');
+  overrides.delete('news?p=2');
+  await page.waitForFunction(() => document.querySelector('[data-mg-retry]')?.disabled === false, { timeout: 6000 });
+  assert.deepEqual(fetches, ['news?p=2'], 'not even once the wait is over');
+  await page.click('[data-mg-retry]');
+  await page.waitForSelector('.mg-page-divider', { timeout: 4000 });
+  assert.deepEqual(fetches, ['news?p=2', 'news?p=2']);
+  assert.equal((await storyIds()).length, 60);
+});
+
+await check('a page that cannot be read shows an error row with a link to open it normally', async () => {
+  await resetStorage();
+  overrides.set('news?p=2', { body: fixture('item.html') });
+  await open('news');
+  await toBottom();
+  await page.waitForSelector('.mg-feed-notice.is-error', { timeout: 4000 });
+  assert.equal(await page.$eval('[data-mg-open-page]', (a) => a.getAttribute('href')), 'news?p=2');
+  assert.equal(await page.$eval('.mg-feed-notice h2', (h) => h.textContent), 'Page 2 could not be shown here');
+  assert.equal((await storyIds()).length, 30, 'page one is untouched');
+});
+
+await check('with the setting off, the plain More link is back and nothing loads on scroll', async () => {
+  await resetStorage();
+  await open('news');
+  await page.click('button[aria-label="Settings"]');
+  const toggle = await page.waitForSelector('xpath///label[contains(., "Load more as you scroll")]//input');
+  await toggle.click();
+  await page.waitForSelector('.mg-more a[rel="next"]', { timeout: 2000 });
+  assert.equal((await readStorage()).settings.infiniteScroll, false, 'the panel writes the setting');
+  await resetStorage({ infiniteScroll: false });
+  await open('news');
+  assert.deepEqual(await page.$eval('.mg-more a.mg-btn', (a) => [a.getAttribute('href'), a.textContent]), ['?p=2', 'More']);
+  assert.equal(await page.$('[data-mg-page], .mg-feed-tail'), null);
+  await toBottom();
+  await sleep(1200);
+  assert.deepEqual(fetches, []);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.keyboard.press(']')]);
+  assert.equal(await here_(), 'news?p=2', '] still opens the next page');
+});
+
+await check('j past the last story loads the next page', async () => {
+  await resetStorage();
+  // Tall enough that the page cannot scroll, so only the key can ask for more.
+  await page.setViewport({ width: 1280, height: 6000 });
+  try {
+    await open('news');
+    await sleep(300);
+    for (let i = 0; i < 30; i++) await page.keyboard.press('j');
+    const ids = await storyIds();
+    assert.equal(await focusedId(), ids[29], 'on the last story');
+    assert.deepEqual(fetches, [], 'nothing before the end');
+    await page.keyboard.press('j');
+    await page.waitForSelector('.mg-page-divider', { timeout: 4000 });
+    assert.deepEqual(fetches, ['news?p=2']);
+    await page.keyboard.press('j');
+    assert.equal(await focusedId(), 50437752, 'j continues into page two');
+  } finally {
+    await page.setViewport({ width: 1280, height: 1000 });
+  }
+});
+
+await check('] and [ jump between page dividers', async () => {
+  await resetStorage();
+  await open('news');
+  await loadNext(1);
+  await page.evaluate(() => scrollTo(0, 0));
+  await sleep(100);
+  await page.keyboard.press(']');
+  await sleep(100);
+  assert.equal(await focusedId(), 50437752, '] lands on page two');
+  const offset = await page.$eval('.mg-page-divider', (d) => d.getBoundingClientRect().top - parseFloat(getComputedStyle(d).scrollMarginTop));
+  assert.ok(Math.abs(offset) < 2, `divider at the top, off by ${offset}`);
+  await page.keyboard.press('[');
+  await sleep(100);
+  assert.equal(await focusedId(), 50442736, '[ returns to page one');
+});
+
+await check('after ten pages a Load more button takes over', async () => {
+  await resetStorage({ indexView: 'compact' });
+  await open('news');
+  for (let n = 1; n <= 10; n++) await loadNext(n);
+  await toBottom();
+  await page.waitForSelector('[data-mg-load-more]', { timeout: 4000 });
+  await sleep(1500);
+  assert.equal(fetches.length, 10, `ten automatic pages, got ${fetches.join(', ')}`);
+  assert.equal(fetches[9], 'news?p=11');
+  await page.click('[data-mg-load-more]');
+  await page.waitForFunction(() => document.querySelectorAll('.mg-page-divider').length === 11, { timeout: 4000 });
+  assert.equal(fetches[10], 'news?p=12');
+  assert.equal(await page.$$eval('.mg-page-divider a', (a) => a[a.length - 1].textContent), 'Page 12');
+});
+
+await check('votes, hide, bookmarks, hover cards and new-reply badges work on added stories', async () => {
+  await resetStorage({}, { history: { 50437752: { title: 'Fossil', url: '', lastVisit: 1, commentCount: 170, seen: [] } } });
+  overrides.set('news?p=2', { body: loggedInP2() });
+  await open('news');
+  await loadNext(1);
+  const row = '[data-id="50408336"]';
+  await page.click(`${row} [data-mg-vote]`);
+  await sleep(200);
+  assert.deepEqual(requests, [{ method: 'GET', key: 'vote?id=50408336&how=up&auth=t1&goto=news%3Fp%3D2' }]);
+  assert.equal(await page.$eval(`${row} [data-mg-vote]`, (b) => b.classList.contains('is-on')), true);
+  const rankBelow = await page.$eval('[data-id="50443587"] .mg-rank', (r) => r.textContent);
+  await page.$$eval(`${row} .mg-act`, (bs) => bs.find((b) => b.textContent === 'hide').click());
+  await page.waitForFunction((sel) => !document.querySelector(sel), { timeout: 2000 }, row);
+  assert.equal(requests[1].key, 'hide?id=50408336&auth=t2&goto=news%3Fp%3D2');
+  assert.equal(await page.$eval('[data-id="50443587"] .mg-rank', (r) => r.textContent), rankBelow, 'ranks unchanged');
+  assert.equal((await storyIds()).length, 59);
+  assert.equal(await page.$eval('[data-id="50437752"] .mg-new', (el) => el.textContent), '+7', 'new-reply badge');
+  await page.$eval('[data-id="50443587"]', (el) => el.scrollIntoView({ block: 'center' }));
+  await page.hover('[data-id="50443587"] a[data-mg-user]');
+  await page.waitForSelector('.mg-hovercard-meta', { timeout: 3000 });
+  await page.mouse.move(5, 5);
+  await page.$eval('[data-id="50443587"] [data-mg-bookmark]', (b) => b.click());
+  await sleep(150);
+  assert.equal((await readStorage()).bookmarks[0]?.id, 50443587);
+});
+
+await check('a comment listing (threads) appends its next page, with the selection popup on it', async () => {
+  await resetStorage();
+  await open('threads?id=dang');
+  await loadNext(1);
+  await sleep(1200);
+  assert.deepEqual(fetches, ['threads?id=dang&next=50429394']);
+  assert.deepEqual(await page.$eval('.mg-page-divider a', (a) => [a.textContent, a.getAttribute('href')]), ['Page 2', 'threads?id=dang&next=50429394']);
+  const after = await page.evaluate(() => {
+    const divider = document.querySelector('.mg-page-divider');
+    return [...document.querySelectorAll('.mg-c')].filter((c) => divider.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING).map((c) => Number(c.id));
+  });
+  assert.ok(after.length > 0, 'comments after the divider');
+  await page.evaluate((id) => {
+    const el = document.querySelector(`[id="${id}"] .mg-commtext`);
+    el.scrollIntoView({ block: 'center' });
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  }, after[0]);
+  await page.waitForSelector('.mg-selpop', { timeout: 2000 });
 });
 
 const API = 'https://hn.algolia.com/api/v1/';

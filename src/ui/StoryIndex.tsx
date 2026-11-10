@@ -1,14 +1,17 @@
-import type { ComponentChildren } from 'preact';
+import { Fragment, type ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
+import type { FeedPage } from '../feed/feed';
 import type { Page, Story } from '../hn/types';
 import { DEFAULT_QUERY, toUrl } from '../search/query';
 import { newCommentCount, storyBookmark } from '../store/ops';
 import type { HistoryEntry, TableColumn } from '../store/schema';
 import { useStore } from '../store/store';
-import { BookmarkButton, MoreLink, plural, profileTabFor, ProfileTabs, UserLink } from './common';
+import { BookmarkButton, plural, profileTabFor, ProfileTabs, UserLink } from './common';
+import { FeedTail, PageMark, PageRow } from './Feed';
 import { FrontDayNav } from './FrontDayNav';
 import { IconComment, IconUp } from './icons';
 import { Marked } from './Marked';
+import { useListFeed } from './useFeed';
 import { useHnToggle } from './useToggle';
 
 type StoriesPage = Extract<Page, { kind: 'stories' }>;
@@ -209,7 +212,7 @@ function TableRow({ story, columns, newTab, entry }: { story: Story; columns: Ta
   );
 }
 
-function StoryTable({ stories, columns, newTab, history }: { stories: Story[]; columns: TableColumn[]; newTab: boolean; history: Record<string, HistoryEntry> }) {
+function StoryTable({ pages, columns, newTab, history }: { pages: FeedPage<Story>[]; columns: TableColumn[]; newTab: boolean; history: Record<string, HistoryEntry> }) {
   return (
     <div class="mg-table-wrap">
       <table class="mg-table">
@@ -223,8 +226,13 @@ function StoryTable({ stories, columns, newTab, history }: { stories: Story[]; c
           </tr>
         </thead>
         <tbody>
-          {stories.map((s) => (
-            <TableRow story={s} columns={columns} newTab={newTab} entry={history[s.id]} />
+          {pages.map((p, i) => (
+            <Fragment key={p.href}>
+              {i > 0 && <PageRow page={p} columns={columns.length} />}
+              {p.items.map((s) => (
+                <TableRow story={s} columns={columns} newTab={newTab} entry={history[s.id]} />
+              ))}
+            </Fragment>
           ))}
         </tbody>
       </table>
@@ -236,33 +244,48 @@ export function StoryIndex({ page }: { page: StoriesPage }) {
   const settings = useStore((s) => s.settings);
   const history = useStore((s) => s.history);
   const [hidden, setHidden] = useState<ReadonlySet<number>>(new Set());
-  const stories = page.stories.filter((s) => !hidden.has(s.id));
+  const control = useListFeed('stories', settings.infiniteScroll, page.meta, page.stories, page.more);
+  const enabled = settings.infiniteScroll;
+  // Hidden stories stay in the feed, so ranks and the dedupe of later pages are unaffected.
+  const pages = (enabled ? control.feed.pages : control.feed.pages.slice(0, 1)).map((p) => ({ ...p, items: p.items.filter((s) => !hidden.has(s.id)) }));
   const profile = profileTabFor(page.meta);
   const fromSite = page.meta.section === 'from' ? page.meta.url.searchParams.get('site') : null;
   const newTab = settings.openLinksInNewTab;
+  const hide = (id: number) => setHidden((h) => new Set([...h, id]));
 
   let body;
   switch (settings.indexView) {
     case 'table':
-      body = <StoryTable stories={stories} columns={settings.tableColumns} newTab={newTab} history={history} />;
+      body = (
+        <>
+          {enabled && <PageMark page={pages[0]!} index={0} />}
+          <StoryTable pages={pages} columns={settings.tableColumns} newTab={newTab} history={history} />
+        </>
+      );
       break;
     case 'compact':
-      body = (
-        <ol class="mg-compact">
-          {stories.map((s) => (
-            <CompactRow story={s} newTab={newTab} entry={history[s.id]} />
-          ))}
-        </ol>
-      );
+      body = pages.map((p, i) => (
+        <Fragment key={p.href}>
+          {enabled && <PageMark page={p} index={i} />}
+          <ol class="mg-compact">
+            {p.items.map((s) => (
+              <CompactRow story={s} newTab={newTab} entry={history[s.id]} />
+            ))}
+          </ol>
+        </Fragment>
+      ));
       break;
     case 'list':
-      body = (
-        <ol class="mg-stories">
-          {stories.map((s) => (
-            <StoryRow story={s} newTab={newTab} entry={history[s.id]} onHidden={() => setHidden(new Set([...hidden, s.id]))} />
-          ))}
-        </ol>
-      );
+      body = pages.map((p, i) => (
+        <Fragment key={p.href}>
+          {enabled && <PageMark page={p} index={i} />}
+          <ol class="mg-stories">
+            {p.items.map((s) => (
+              <StoryRow story={s} newTab={newTab} entry={history[s.id]} onHidden={() => hide(s.id)} />
+            ))}
+          </ol>
+        </Fragment>
+      ));
       break;
   }
 
@@ -284,8 +307,8 @@ export function StoryIndex({ page }: { page: StoriesPage }) {
           </a>
         </p>
       )}
-      {stories.length === 0 ? <p class="mg-empty">No stories here yet.</p> : body}
-      <MoreLink href={page.more} />
+      {pages[0]!.items.length === 0 && pages.length === 1 ? <p class="mg-empty">No stories here yet.</p> : body}
+      <FeedTail control={control} enabled={enabled} more={page.more} />
     </div>
   );
 }

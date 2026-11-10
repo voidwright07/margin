@@ -21,8 +21,9 @@ Every feature is free. There is no account, no paid tier and no tracking.
 
 **Reading**
 
-- Six themes (system, light, classic, slate, dark, black), three font families, and settings for text size, line height, column width and justified text.
+- Six themes (system, light, classic, slate, dark, black), three font families, and settings for text size, line height, column width and justified text. Settings also choose the list view, new-tab links, keyboard shortcuts, thread line colours and infinite scroll.
 - Story lists in list, table (choose the columns) or compact view, on every page: page 2 and beyond, `newest?next=…`, past front pages, Ask, Show, Jobs, Best, `from?site=`, submissions and favorites.
+- Infinite scroll on story and comment lists: the next page loads as you near the bottom, under a "Page N" divider that links to that page. The address bar follows the page you are reading, and the Back button returns to the same spot with every loaded page. It stops after ten pages for a Load more button, waits politely when HN rate-limits, and can be turned off in settings to get HN's More link back.
 - A date picker for the front page of any past day.
 - One click back to the original design, and one click to return.
 
@@ -58,7 +59,7 @@ Every feature is free. There is no account, no paid tier and no tracking.
 | `h` / `r` | Parent / root comment |
 | `x` | Collapse or expand |
 | `n` / `p` | Next / previous new comment |
-| `[` / `]` | Previous / next page |
+| `[` / `]` | Previous / next page (the page dividers, with infinite scroll) |
 | `o` / `c` | Open the link / open the comments |
 | `u` / `b` | Upvote / bookmark |
 | `Shift+R` | Reply |
@@ -143,7 +144,7 @@ These scripts run Chrome for Testing headless with the built extension. They ans
 ```sh
 pnpm dlx @puppeteer/browsers install chrome@stable --path .cache/browsers
 pnpm build:chrome
-pnpm e2e                         # behaviour checks: votes, replies, keys, history, highlights, toggle, search
+pnpm e2e [filter]                # behaviour checks: votes, replies, keys, history, highlights, toggle, search, infinite scroll
 node scripts/shots.mjs [outDir]  # screenshots of each page kind in each theme
 ```
 
