@@ -62,12 +62,20 @@ The comment list stays flat in document order with `depth`, the same way HN stor
 
 ```ts
 const detectors: Array<{ kind: Page['kind']; test(doc: Document): boolean; parse(doc, url): Page }> = [
-  item (doc has table.fatitem), user (td[timestamp] inside the "user:" row), comments (tr.comtr),
+  item (doc has table.fatitem), user (td[timestamp] inside the "user:" row), comments (tr.athing holding td.default),
   stories (tr.athing.submission), passthrough (fallback, always matches)
 ]
 ```
 
 The first match wins. Adding a page type means adding one entry.
+
+The captured HTML corrected three details of the first draft:
+
+- Comment *listings* (`newcomments`, `bestcomments`, `favorites?comments=t`) use plain `tr.athing`; only trees (`item`, `threads`) add `.comtr`. The comments detector therefore matches any `tr.athing` that holds a `td.default` comment cell.
+- `section` comes from `<html op="…">`, which HN sets on every framed page (`news`, `newest`, `front`, `threads`, …). No URL path is consulted.
+- On item pages HN writes the `parent` link as a fragment (`#50443236`), so `parentId` on trees comes from the depth stack; on listings the `parent` link's `?id=` wins.
+
+`Story` and `Comment` carry a `type: 'story' | 'comment'` tag so `item.root: Story | Comment` can be narrowed without guessing from fields. `UserProfile` is `{ id, created (unix seconds from td[timestamp]), createdText, karma, about (HTML or null), editable }`; `editable` is true on your own profile, where HN renders the settings form, and the renderer adopts that form into the About tab.
 
 ## Persistent state
 

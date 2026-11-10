@@ -1,0 +1,30 @@
+{
+  "name": "margin-for-hn",
+  "description": "A calm, readable redesign of every Hacker News page.",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "wxt build && wxt build -b firefox",
+    "build:chrome": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip && wxt zip -b firefox",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "icons": "node scripts/icons.mjs",
+    "shots": "node scripts/shots.mjs",
+    "postinstall": "wxt prepare",
+    "check": "tsc --noEmit && vitest run"
+  },
+  "dependencies": {
+    "preact": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "linkedom": "^0.18.15",
+    "puppeteer-core": "^25.17.0",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0",
+    "wxt": "^0.21.5"
+  }
+}
