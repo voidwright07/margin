@@ -104,7 +104,7 @@ type SearchResult = { hits: Array<StoryHit | CommentHit>; total: number; page: n
 
 `src/store/` holds a single versioned schema in `chrome.storage.local`, with `{ version, settings, history, bookmarks, highlights }`. Backup exports exactly this JSON. Restore validates it at the boundary and migrates by version.
 
-- `settings`: theme (`system|light|classic|slate|dark|black`), font (`sans|serif|mono`), fontSize, columnWidth, lineHeight, justify, indexView (`list|table|compact`), tableColumns, openLinksInNewTab, enabled (old-design toggle), keyboard on/off, threadLines (`rainbow|accent|mono`, the rail colours).
+- `settings`: theme (`system|light|classic|slate|dark|black`), font (`sans|serif|mono`), fontSize, columnWidth, lineHeight, justify, indexView (`list|table|compact`), tableColumns, openLinksInNewTab, enabled (old-design toggle), keyboard on/off, threadLines (`rainbow|accent|mono`, the rail colours), infiniteScroll (on by default; off keeps HN's More link).
 - `history`: `Record<storyId, { title, url, lastVisit, commentCount, seen: number[], collapsed: number[] }>` capped by LRU at 2000 stories. `seen` stores the comment ids already rendered on a visit. "New replies" means the ids on the current visit minus `seen`. `collapsed` holds the comments the reader collapsed in that story's threads (the 200 most recent), so it is capped, pruned, backed up and restored together with its history entry.
 - `bookmarks`: a tagged union `{ type: 'story' | 'comment' | 'user'; id; savedAt; snapshot }`.
 - `highlights`: `{ id, itemId, commentId | null, text, createdAt }`, re-applied by text match inside the target node.

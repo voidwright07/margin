@@ -120,6 +120,20 @@ describe('store module owns chrome.storage.local', () => {
   });
 });
 
+describe('infinite scroll setting', () => {
+  it('is on by default, keeps a stored boolean and rejects anything else', () => {
+    expect(defaultState().settings.infiniteScroll).toBe(true);
+    expect(parseState({ settings: { infiniteScroll: false } }).settings.infiniteScroll).toBe(false);
+    expect(parseState({ settings: { infiniteScroll: 'false' } }).settings.infiniteScroll).toBe(true);
+    expect(parseState({ settings: { infiniteScroll: 0 } }).settings.infiniteScroll).toBe(true);
+  });
+
+  it('survives a backup round trip when turned off', () => {
+    const s = { ...defaultState(), settings: { ...defaultState().settings, infiniteScroll: false } };
+    expect(parseBackup(JSON.stringify(s)).settings.infiniteScroll).toBe(false);
+  });
+});
+
 describe('thread settings and collapsed comments', () => {
   it('validates threadLines, defaulting to rainbow', () => {
     expect(defaultState().settings.threadLines).toBe('rainbow');

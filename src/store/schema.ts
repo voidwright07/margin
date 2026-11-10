@@ -27,6 +27,8 @@ export type Settings = {
   tableColumns: TableColumn[];
   openLinksInNewTab: boolean;
   keyboard: boolean;
+  /** Story and comment lists load the next page as you near the bottom, instead of showing a More link. */
+  infiniteScroll: boolean;
   /** Thread rail colours: a hue per depth, one accent hue fading with depth, or plain gray. */
   threadLines: ThreadLines;
 };
@@ -79,6 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tableColumns: ['rank', 'vote', 'title', 'score', 'by', 'age', 'comments'],
   openLinksInNewTab: false,
   keyboard: true,
+  infiniteScroll: true,
   threadLines: 'rainbow',
 };
 
@@ -125,6 +128,7 @@ export const parseSettings = (raw: unknown): Settings => {
     tableColumns: cols && cols.includes('title') ? cols : [...d.tableColumns],
     openLinksInNewTab: bool(r.openLinksInNewTab, d.openLinksInNewTab),
     keyboard: bool(r.keyboard, d.keyboard),
+    infiniteScroll: bool(r.infiniteScroll, d.infiniteScroll),
     threadLines: oneOf(THREAD_LINES, r.threadLines, d.threadLines),
   };
 };
