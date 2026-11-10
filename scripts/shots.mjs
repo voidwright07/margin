@@ -71,7 +71,7 @@ SCENES.push(
   { name: 'news-badges-light', path: 'news', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] }, '50441707': { title: 'x', url: '', lastVisit: 1, commentCount: 140, seen: [] } } },
 );
 
-const { browser, page, served, warnings, resetStorage, open } = await launch();
+const { browser, page, ext, extId, served, warnings, resetStorage, open } = await launch();
 mkdirSync(OUT, { recursive: true });
 let failed = 0;
 for (const scene of SCENES.filter((s) => s.name.includes(FILTER))) {
@@ -94,6 +94,25 @@ for (const scene of SCENES.filter((s) => s.name.includes(FILTER))) {
   if (mode === 'timeout' || mode === 'raw') failed++;
   console.log(`${String(mode).padEnd(8)} ${file}`);
 }
+// The extension's own pages: options and the toolbar popup.
+for (const [name, path, viewport, scheme] of [
+  ['options-light', 'options.html', DESKTOP, 'light'],
+  ['options-dark', 'options.html', DESKTOP, 'dark'],
+  ['popup-light', 'popup.html', { width: 340, height: 420 }, 'light'],
+  ['popup-dark', 'popup.html', { width: 340, height: 420 }, 'dark'],
+].filter(([n]) => n.includes(FILTER))) {
+  await resetStorage({}, { history: { '50442736': { title: '.name Grandfathered', url: 'https://neil.fraser.name/news/2026/11/10/', lastVisit: Date.now() - 3600e3, commentCount: 78, seen: [] } } });
+  const p = await browser.newPage();
+  await p.setViewport(viewport);
+  await p.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
+  await p.goto(`chrome-extension://${extId}/${path}`);
+  await sleep(300);
+  const file = join(OUT, `${name}.png`);
+  await p.screenshot({ path: file });
+  await p.close();
+  console.log(`page     ${file}`);
+}
+void ext;
 console.log(JSON.stringify({ served, warnings: [...new Set(warnings)] }, null, 2));
 await browser.close();
 if (failed) {
