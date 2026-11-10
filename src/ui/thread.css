@@ -1,4 +1,4 @@
-/* Comment threads: rail colours, quotes, the indent cap and thread navigation. */
+/* Comment threads: rail colours, quotes, the indent cap, collapsed previews and thread navigation. */
 
 /* Six rail hues per theme, at full strength. Rails mix them into the page background by --rail-mix, and a
    hovered branch shows the full hue. Adjacent depths sit far apart on the colour wheel. */
@@ -84,6 +84,30 @@ html[data-mg-lines='accent'] .mg-rail:nth-child(3) { --rail-fade: 44%; }
 html[data-mg-lines='accent'] .mg-rail:nth-child(4) { --rail-fade: 35%; }
 html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
 
+/* Top-level threads are separated; replies inside a thread sit closer together. */
+.mg-thread > .mg-c.is-top:not(:first-child) {
+  margin-top: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.mg-c:not(.is-top) > .mg-c-main {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.mg-thread .mg-c-head {
+  cursor: pointer;
+}
+
+.mg-c.is-op:not([data-mg-focused]):not(.is-replying) > .mg-c-main {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+.mg-c.is-replying > .mg-c-main {
+  background: var(--bg-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+  padding-left: 12px;
+}
+
 .mg-commtext .mg-quote {
   margin: 0.65em 0 0;
   padding: 1px 0 1px 12px;
@@ -100,6 +124,15 @@ html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
 }
 .mg-quote-mark {
   display: none;
+}
+
+.mg-c-preview {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
 }
 
 .mg-c-navs {

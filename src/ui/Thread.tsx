@@ -4,7 +4,7 @@ import { commentBookmark } from '../store/ops';
 import type { Highlight } from '../store/schema';
 import { useStore } from '../store/store';
 import { BookmarkButton, UserLink } from './common';
-import { markQuotes } from './commentText';
+import { collapsedPreview, markQuotes } from './commentText';
 import { Composer } from './Composer';
 import { applyHighlights } from './highlight';
 import { IconDown, IconUp } from './icons';
@@ -116,6 +116,15 @@ function FaveFlag({ comment }: { comment: Comment }) {
   );
 }
 
+const INTERACTIVE = 'a, button, input, textarea, select, label, [role="button"]';
+
+/** A click on bare header space toggles collapse; controls, links and a text selection keep their own meaning. */
+const isHeaderToggleClick = (e: MouseEvent): boolean => {
+  if ((e.target as Element).closest(INTERACTIVE)) return false;
+  const sel = window.getSelection();
+  return !sel || sel.isCollapsed || sel.toString().trim() === '';
+};
+
 function ParentText({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -188,10 +197,13 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
 }) {
   const { comment: c, ancestors, size, collapsed } = row;
   const story = c.story;
+  const isOp = op !== null && c.by === op;
+  const replying = reply !== null;
+  const preview = useMemo(() => (collapsed && !c.deleted ? collapsedPreview(c.html, document) : ''), [collapsed, c.deleted, c.html]);
   return (
     <article
       id={String(c.id)}
-      class={`mg-c${collapsed ? ' is-collapsed' : ''}${isNew ? ' is-new' : ''}${c.dead ? ' is-dead' : ''}`}
+      class={`mg-c${c.depth === 0 ? ' is-top' : ''}${collapsed ? ' is-collapsed' : ''}${isNew ? ' is-new' : ''}${c.dead ? ' is-dead' : ''}${isOp ? ' is-op' : ''}${replying ? ' is-replying' : ''}`}
       data-mg-nav
       data-id={c.id}
       data-depth={c.depth}
@@ -214,10 +226,10 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
       </div>
       <div class="mg-c-main">
         {parent && !collapsed && c.depth > RAIL_CAP.narrow && <ReplyingTo parent={parent} deep={c.depth > RAIL_CAP.wide} />}
-        <div class="mg-c-head">
+        <div class="mg-c-head" onClick={(e) => isHeaderToggleClick(e) && onToggle()}>
           {!c.deleted && <CommentVotes comment={c} />}
-          {c.deleted ? <span class="mg-c-deleted">[deleted]</span> : <UserLink name={c.by} op={op !== null && c.by === op} />}
-          {op !== null && c.by === op && <span class="mg-op">OP</span>}
+          {c.deleted ? <span class="mg-c-deleted">[deleted]</span> : <UserLink name={c.by} op={isOp} />}
+          {isOp && <span class="mg-op">OP</span>}
           <a class="mg-c-age" href={`item?id=${c.id}`} title={c.time}>
             {c.ageText}
           </a>
@@ -226,6 +238,7 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
           <button type="button" class="mg-c-toggle" data-mg-collapse aria-expanded={!collapsed} title={collapsed ? 'Expand (x)' : 'Collapse (x)'} onClick={onToggle}>
             {collapsed ? `[+${size}]` : '[–]'}
           </button>
+          {preview && <span class="mg-c-preview">“{preview}”</span>}
           {!collapsed && parent && (
             <span class="mg-c-navs">
               {root && root !== parent && (

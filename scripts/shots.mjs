@@ -67,6 +67,7 @@ SCENES.push(
       await p.mouse.up();
     },
   },
+  { name: 'replying-light', path: 'item?id=9100', run: (p) => p.click('[id="9101"] [data-mg-reply]') },
   // Thread readability. item?id=9200 is the synthetic deep fixture (fixtures/synthetic/item-deep.html).
   ...['rainbow', 'accent', 'mono'].flatMap((threadLines) =>
     ['light', 'dark'].map((scheme) => ({ name: `rails-${threadLines}-${scheme}`, path: 'item?id=50442736', scheme, settings: { threadLines }, scrollTo: '[id="50444082"]' })),

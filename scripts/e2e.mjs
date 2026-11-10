@@ -241,12 +241,47 @@ await check('the theme stored in settings themes the page', async () => {
   assert.equal(await page.evaluate(() => document.documentElement.dataset.mgTheme), 'slate');
 });
 
+const isCollapsed = (id) => page.$eval(`[id="${id}"]`, (el) => el.classList.contains('is-collapsed'));
 const focusedId = () => page.$eval('[data-mg-focused]', (el) => Number(el.dataset.id)).catch(() => null);
 const shift = async (code) => {
   await page.keyboard.down('Shift');
   await page.keyboard.press(code);
   await page.keyboard.up('Shift');
 };
+
+await check('a click on bare header space collapses; links, buttons and selected text do not', async () => {
+  await resetStorage();
+  await open('item?id=50442736');
+  const head = '[id="50443236"] > .mg-c-main > .mg-c-head';
+  const bare = await page.$eval(head, (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.right - 3, y: r.top + r.height / 2 };
+  });
+  assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('mg-c-head'), bare), true, 'the point is bare header space');
+  await page.mouse.click(bare.x, bare.y);
+  assert.equal(await isCollapsed(50443236), true, 'header click collapses');
+  await page.mouse.click(bare.x, bare.y);
+  assert.equal(await isCollapsed(50443236), false, 'second click expands');
+
+  await page.evaluate(() => document.addEventListener('click', (e) => e.target.closest('a') && e.preventDefault(), { capture: true, once: true }));
+  await page.click(`${head} .mg-c-age`);
+  assert.equal(await isCollapsed(50443236), false, 'a link click inside the header does not collapse');
+  await page.click('[id="50444082"] .mg-c-navs a');
+  assert.equal(await isCollapsed(50444082), false, 'the parent link does not collapse');
+  assert.equal(await focusedId(), 50443236, 'the parent link focuses the parent');
+
+  await page.mouse.click(bare.x, bare.y);
+  const preview = await page.$eval(`${head} .mg-c-preview`, (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + 4, y: r.top + r.height / 2, w: r.width };
+  });
+  await page.mouse.move(preview.x, preview.y);
+  await page.mouse.down();
+  await page.mouse.move(preview.x + preview.w / 2, preview.y, { steps: 5 });
+  await page.mouse.up();
+  assert.ok((await page.evaluate(() => getSelection().toString())).length > 5, 'text got selected');
+  assert.equal(await isCollapsed(50443236), true, 'selecting header text does not expand');
+});
 
 await check('Shift+J, Shift+K, h and r move focus by thread structure', async () => {
   await resetStorage();

@@ -62,3 +62,22 @@ export const markQuotes = (root: Element): void => {
   }
   flush();
 };
+
+const textOf = (n: Node): string =>
+  n.nodeType === 3 ? (n as Text).data : `${isBlock(n) ? ' ' : ''}${Array.from(n.childNodes, textOf).join('')}`;
+
+/** Plain text of comment HTML, paragraphs joined by spaces, whitespace collapsed. Parsed inert, in a template. */
+export const plainText = (html: string, doc: Document): string => {
+  const t = doc.createElement('template');
+  t.innerHTML = html;
+  return Array.from(t.content.childNodes, textOf).join('').replace(/\s+/g, ' ').trim();
+};
+
+/** The excerpt a collapsed comment shows: about `max` characters, cut at a word, with an ellipsis when cut. */
+export const collapsedPreview = (html: string, doc: Document, max = 80): string => {
+  const text = plainText(html, doc);
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s.,;:!?-]+$/, '')}…`;
+};

@@ -113,6 +113,8 @@ Thread styles live in `src/ui/thread.css`; the structure helpers work on the fla
 - Quotes are found in the rendered DOM, not in the HTML string. After a comment's HTML is inserted, `markQuotes` (`src/ui/commentText.ts`) walks its top-level nodes. A paragraph whose text starts with `>`, including HN's bare first paragraph, becomes a `p.mg-quote` block. The leading `>` stays in the DOM inside a hidden span, so highlights, copy and quoting still match the original text. `<pre>` is never touched; it scrolls sideways in the mono font.
 - Indentation stops at 6 rails (3 below 760px wide). A deeper comment shows "↳ replying to <author>". Hovering or focusing the label previews the parent in a popover, and clicking it moves focus there.
 - Parent, root and top-level moves come from `navTarget` in `src/ui/threadNav.ts`, a scan over any depth-ordered list. The thread renderer runs it on the comment array. The keyboard runs it on the rendered rows' `data-depth`, which works because collapsing hides only descendants. Comments at depth 1 and deeper get muted `parent` and `root` links in the header, as on HN.
+- A click on bare header space toggles collapse; clicks on links, buttons and inputs, and clicks that end a text selection, do not. A collapsed row is one line: author, age, `[+N]` and a plain-text preview of about 80 characters.
+- Top-level threads are separated by extra space and a hairline. OP comments get a faint accent tint, and the comment being replied to keeps a highlight while its reply box is open.
 
 ## Feature checklist (ModernHN free + Pro)
 

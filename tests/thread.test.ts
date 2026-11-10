@@ -6,7 +6,7 @@ import { parsePage } from '../src/hn/registry';
 import type { Comment, PageMeta } from '../src/hn/types';
 import { frontDay } from '../src/ui/FrontDayNav';
 import { applyHighlights } from '../src/ui/highlight';
-import { markQuotes } from '../src/ui/commentText';
+import { collapsedPreview, markQuotes, plainText } from '../src/ui/commentText';
 import { subtreeSizes, visibleRows } from '../src/ui/Thread';
 import { navTarget } from '../src/ui/threadNav';
 
@@ -154,5 +154,23 @@ describe('quote blocks come from the rendered comment DOM', () => {
     const quotes = Array.from(el.querySelectorAll('.mg-quote'));
     expect(quotes).toHaveLength(1);
     expect(quotes[0]!.textContent).toMatch(/^> After a long and expensive battle/);
+  });
+});
+
+describe('collapsed preview text', () => {
+  const doc = blankDoc();
+
+  it('is plain text with paragraphs joined and entities decoded', () => {
+    expect(plainText('Short &amp; <i>sweet</i>.<p>Second <a href="x">link</a>.</p><pre><code>a\n  b</code></pre>', doc)).toBe('Short & sweet. Second link. a b');
+    expect(collapsedPreview('Short &amp; <i>sweet</i>.', doc)).toBe('Short & sweet.');
+  });
+
+  it('cuts long text near 80 characters at a word and adds an ellipsis', () => {
+    const p = collapsedPreview(itemComments()[0]!.html, doc);
+    expect(p).toBe('> After a long and expensive battle, news just dropped that Verisign is…');
+    expect(p.length).toBeLessThanOrEqual(81);
+    const medium = 'word '.repeat(24).trim();
+    expect(medium.length).toBeGreaterThan(80);
+    expect(collapsedPreview(medium, doc)).toBe(`${'word '.repeat(16).trim()}…`);
   });
 });
