@@ -94,6 +94,17 @@ Keep all storage access behind one module. Components subscribe through a single
 2. On `DOMContentLoaded`: run the detector registry, parse, hide the original `<center>` and mount Preact in `#margin-root`. Keep the original DOM so the old-design toggle is instant. A failed parse is caught: unhide the original, apply theme CSS only, and `console.warn`. A page never ends up blank.
 3. Navigation stays full page loads on plain links. Actions (vote, hide, fave, flag) call `fetch(href, { credentials: 'include' })` and update optimistically. Inline reply posts the `ReplyForm`. To reply to a comment, fetch `reply?id=…`, parse its form for the `hmac`, then POST.
 
+### Implementation notes
+
+These details were settled while building and differ from, or add to, the plan above.
+
+- The store keeps a boot hint (`enabled` and `theme` only) in the page's `localStorage` under `margin:boot`. `chrome.storage` is asynchronous, and the hint lets step 1 theme the page and hide the old design before the first paint. The store module writes and reads the hint; nothing else touches it.
+- Display has three modes, chosen in `src/app/boot.tsx`: `margin` (new design), `original` (user toggled off; a small pill returns) and `raw` (parse or render failed; original page with theme colours). A Preact error boundary reports render failures into `raw`.
+- Passthrough pages, and the settings form on your own profile, move HN's original nodes into the themed layout and put them back on unmount, so the old-design toggle restores an untouched DOM.
+- Logged-out readers see HN's reply form markup, but HN rejects their posts. Margin shows "Log in to comment" instead of a composer when `meta.viewer` is null, and comment replies stay plain links to HN.
+- Keyboard focus is a `data-mg-focused` attribute, not a class, because Preact rewrites `className` when a row re-renders.
+- The section tabs include Comments (`newcomments`) in addition to the sections HN lists in its header.
+
 ## Feature checklist (ModernHN free + Pro)
 
 Free: themes, fonts, styles (width, line height, justify), history page/panel, inline reply and collapsible threads, list/table index with configurable columns, redesigned profile with tabs (about / submissions / comments / favorites), every account action, one-click old-design toggle.
@@ -105,4 +116,5 @@ Beyond ModernHN: every list and comment page in its paginated forms, plus `item?
 ## Verification
 
 - `pnpm test`: the fixture suite in `fixtures/` (real HN HTML, captured 2026-11-10). Every fixture must route to its expected `kind` and parse non-empty, correct data. A table in the test maps each fixture to its kind.
+- `pnpm e2e` (`scripts/e2e.mjs`): headless behaviour checks on the built extension against fixtures, asserting the exact requests sent for votes, favorites and replies, plus keys, history, highlights and the old-design toggle.
 - Visual check: a headless Puppeteer script (Chrome for Testing, `headless: true`, extension loaded) serves fixtures through request interception for `news.ycombinator.com` and writes screenshots to a scratch directory for review. **It must never open a visible window** (the user's standing rule). Keep live requests to HN at a minimum, because HN rate-limits.

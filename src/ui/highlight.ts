@@ -21,13 +21,14 @@ export const applyHighlights = (root: HTMLElement, items: Array<{ id: string; te
       const from = Math.max(at, start) - start;
       const to = Math.min(end, start + len) - start;
       if (to <= 0 || from >= len || from >= to) continue;
-      const target = node.splitText(from);
-      target.splitText(to - from);
-      const mark = root.ownerDocument.createElement('mark');
+      const doc = root.ownerDocument;
+      const mark = doc.createElement('mark');
       mark.className = 'mg-hl';
       mark.dataset.hl = id;
-      target.parentNode!.replaceChild(mark, target);
-      mark.appendChild(target);
+      mark.textContent = node.data.slice(from, to);
+      const parts = [doc.createTextNode(node.data.slice(0, from)), mark, doc.createTextNode(node.data.slice(to))];
+      for (const part of parts) node.parentNode!.insertBefore(part, node);
+      node.parentNode!.removeChild(node);
     }
   }
 };

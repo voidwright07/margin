@@ -174,7 +174,7 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
                   context
                 </a>
               )}
-              {c.parentId !== null && !c.actions.context && c.depth === 0 && (
+              {c.parentId !== null && !c.actions.context && story !== null && c.parentId !== story.id && (
                 <a class="mg-act" href={`item?id=${c.parentId}`}>
                   parent
                 </a>

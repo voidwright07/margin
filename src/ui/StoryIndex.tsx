@@ -5,7 +5,7 @@ import type { HistoryEntry, TableColumn } from '../store/schema';
 import { useStore } from '../store/store';
 import { BookmarkButton, MoreLink, plural, profileTabFor, ProfileTabs, UserLink } from './common';
 import { FrontDayNav } from './FrontDayNav';
-import { IconUp } from './icons';
+import { IconComment, IconUp } from './icons';
 import { useHnToggle } from './useToggle';
 
 type StoriesPage = Extract<Page, { kind: 'stories' }>;
@@ -130,8 +130,11 @@ function CompactRow({ story, newTab, entry }: { story: Story; newTab: boolean; e
         <TitleLink story={story} newTab={newTab} />
         {story.site && <span class="mg-site">{story.site}</span>}
       </span>
-      <span class="mg-compact-num">{score ?? ''}</span>
-      <a class="mg-compact-num mg-comments-link" href={`item?id=${story.id}`} data-mg-comments>
+      <span class="mg-compact-num" title={score === null ? undefined : plural(score, 'point')}>
+        {score ?? ''}
+      </span>
+      <a class="mg-compact-num mg-comments-link" href={`item?id=${story.id}`} data-mg-comments title={story.comments === null ? undefined : plural(story.comments, 'comment')}>
+        {story.comments !== null && <IconComment size={13} class="mg-compact-icon" />}
         {story.comments ?? ''}
         <NewBadge entry={entry} story={story} />
       </a>

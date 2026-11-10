@@ -64,6 +64,7 @@ export const IconSearch = (p: P) =>
     </>,
     p,
   );
+export const IconComment = (p: P) => svg(<path d="M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z" />, p);
 export const IconClose = (p: P) => svg(<path d="M6 6l12 12M18 6 6 18" />, p);
 export const IconChevronLeft = (p: P) => svg(<path d="m15 5-7 7 7 7" />, p);
 export const IconChevronRight = (p: P) => svg(<path d="m9 5 7 7-7 7" />, p);
@@ -75,8 +76,6 @@ export const IconKeyboard = (p: P) =>
     </>,
     p,
   );
-export const IconStar = (p: P & { filled?: boolean }) =>
-  svg(<path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" />, p, p.filled ?? false);
 
 /** The Margin mark: a page with a wide left margin rule. Original artwork, also used for the toolbar icon. */
 export const Logo = ({ size = 22 }: { size?: number }) => (
