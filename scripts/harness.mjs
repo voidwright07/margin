@@ -30,6 +30,8 @@ const findChrome = () => {
 
 /** HN path + query -> fixture file. */
 export const ROUTES = {
+  '': 'news.html',
+  '?p=2': 'news-p2.html',
   'news': 'news.html',
   'news?p=2': 'news-p2.html',
   'newest': 'newest.html',

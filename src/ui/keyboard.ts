@@ -104,6 +104,12 @@ const pageJump = (delta: 1 | -1): boolean => {
   return true;
 };
 
+/** Past the last page marker, `]` asks the feed for more (it ignores the ask while loading or waiting); without markers it opens the next page. */
+const moreOrNextPage = () => {
+  if (document.querySelector(PAGE_MARK)) document.dispatchEvent(new CustomEvent(FEED_MORE_EVENT));
+  else clickPage('[data-mg-next]', '[data-mg-nextday]');
+};
+
 const clickIn = (selector: string) => {
   const scope = current();
   const el = scope?.querySelector<HTMLElement>(selector) ?? (scope ? null : document.querySelector<HTMLElement>(`#margin-root ${selector}`));
@@ -144,7 +150,7 @@ export const COMMANDS: Command[] = [
   { keys: ['b'], label: 'Bookmark', run: () => clickIn('[data-mg-bookmark]') },
   { keys: ['x'], label: 'Collapse or expand thread', run: () => clickIn('[data-mg-collapse]') },
   { keys: ['R'], label: 'Reply to the comment', run: () => clickIn('[data-mg-reply]') },
-  { keys: [']'], label: 'Next page', run: () => void (pageJump(1) || clickPage('[data-mg-next]', '[data-mg-nextday]')) },
+  { keys: [']'], label: 'Next page', run: () => void (pageJump(1) || moreOrNextPage()) },
   { keys: ['['], label: 'Previous page', run: () => void (pageJump(-1) || clickPage('[data-mg-prev]') || history.back()) },
   { keys: ['/'], label: 'Search', run: focusSearch },
   { keys: ['g'], label: 'Back to top', run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },

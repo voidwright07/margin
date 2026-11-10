@@ -69,6 +69,7 @@ export function useFeed<K extends FeedKind>(
     load,
     enabled,
     armed: init.scrollY !== null,
+    restoreY: init.scrollY,
     lastSettled: 0,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
     inflight: null as AbortController | null,
@@ -111,11 +112,17 @@ export function useFeed<K extends FeedKind>(
   };
 
   useEffect(() => {
-    if (!enabled) return;
-    const id = ensureEntryId();
-    const save = () => writeFeed(id, toSnapshot(kind, live.feed, Math.round(scrollY), Date.now()));
-    if (init.scrollY !== null) {
-      const y = init.scrollY;
+    if (!enabled) {
+      // Turned off with a later page in the address bar: only page one is shown now, so name it.
+      if (here() !== first.href) history.replaceState(history.state, '', `/${first.href}`);
+      return;
+    }
+    // The entry is looked up on every save: a search can push a new entry under the same mounted feed.
+    const save = () => writeFeed(ensureEntryId(), toSnapshot(kind, live.feed, Math.round(scrollY), Date.now()));
+    // Restore the offset once; turning the setting off and on again must not jump back.
+    const y = live.restoreY;
+    live.restoreY = null;
+    if (y !== null) {
       scrollTo(0, y);
       // The browser may restore its own idea of the offset when loading finishes; ours wins.
       if (document.readyState !== 'complete') addEventListener('load', () => scrollTo(0, y), { once: true });
@@ -127,8 +134,9 @@ export function useFeed<K extends FeedKind>(
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
+        // Hrefs are HN-relative, and the front page's is '' (it lives at `/`).
         const href = pageInView();
-        if (href && href !== here()) history.replaceState(history.state, '', href);
+        if (href !== undefined && href !== here()) history.replaceState(history.state, '', `/${href}`);
         maybeAuto();
       });
     };
@@ -138,7 +146,11 @@ export function useFeed<K extends FeedKind>(
     addEventListener('scroll', onScroll, { passive: true });
     addEventListener('pagehide', save);
     document.addEventListener('visibilitychange', onVisibility);
-    document.addEventListener(FEED_MORE_EVENT, start);
+    // A held `j` repeats; after a failed page it may retry at most once a second.
+    const onMoreKey = () => {
+      if (Date.now() - live.lastSettled >= GAP_MS) start();
+    };
+    document.addEventListener(FEED_MORE_EVENT, onMoreKey);
     return () => {
       io.disconnect();
       cancelAnimationFrame(frame);
@@ -146,7 +158,7 @@ export function useFeed<K extends FeedKind>(
       removeEventListener('scroll', onScroll);
       removeEventListener('pagehide', save);
       document.removeEventListener('visibilitychange', onVisibility);
-      document.removeEventListener(FEED_MORE_EVENT, start);
+      document.removeEventListener(FEED_MORE_EVENT, onMoreKey);
       live.inflight?.abort();
       live.inflight = null;
       apply(cancelLoad);
@@ -156,8 +168,7 @@ export function useFeed<K extends FeedKind>(
   // Each settled page is saved at once, and the next one may follow if the bottom is still close.
   useEffect(() => {
     if (!enabled || feed.tail.status === 'loading') return;
-    const id = entryId();
-    if (id !== null) writeFeed(id, toSnapshot(kind, feed, Math.round(scrollY), Date.now()));
+    writeFeed(ensureEntryId(), toSnapshot(kind, feed, Math.round(scrollY), Date.now()));
     maybeAuto();
   }, [feed, enabled]);
 

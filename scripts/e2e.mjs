@@ -12,7 +12,7 @@ let algoliaStatus = 200;
 let replyResponse = null;
 /** Pages the content script fetched from HN (infinite scroll), as `path?query`. */
 const fetches = [];
-/** Per-check answers for HN paths: `{ status, body }`, served instead of the fixture router. */
+/** Per-check answers for HN paths: `{ status, body }`, or 'hang' to never answer, instead of the fixture router. */
 const overrides = new Map();
 
 // Back always reloads the document here, so the restore checks prove the page restores itself without bfcache.
@@ -29,6 +29,7 @@ const { browser, page, resetStorage, readStorage, open, fixture, warnings } = aw
     const key = url.pathname.slice(1) + url.search;
     if (req.resourceType() === 'fetch' && !/^(vote|fave|hide|flag|reply|comment|user)\b/.test(key)) fetches.push(key);
     const override = overrides.get(key);
+    if (override === 'hang') return true;
     if (override) {
       await req.respond({ status: override.status ?? 200, contentType: 'text/html; charset=utf-8', body: override.body });
       return true;
@@ -55,8 +56,12 @@ const { browser, page, resetStorage, readStorage, open, fixture, warnings } = aw
 
 const results = [];
 const ONLY = process.argv[2] ?? '';
+// Chrome keeps at most 50 session-history entries; each check starts from an empty history, so history.length
+// assertions stay meaningful however many checks ran before.
+const cdp = await page.createCDPSession();
 const check = async (name, fn) => {
   if (!name.includes(ONLY)) return;
+  await cdp.send('Page.resetNavigationHistory');
   requests.length = 0;
   algolia.length = 0;
   algoliaStatus = 200;
@@ -461,6 +466,17 @@ await check('the address bar follows the page in view without adding history ent
   assert.equal(await page.evaluate(() => history.length), length, 'replaced, never pushed');
 });
 
+await check('on the front page at /, the address bar goes to /?p=2 and back to /', async () => {
+  await resetStorage();
+  await open('');
+  await loadNext(1);
+  assert.deepEqual(fetches, ['?p=2']);
+  await page.$eval('.mg-page-divider', (d) => d.scrollIntoView({ block: 'start' }));
+  await page.waitForFunction(() => location.pathname === '/' && location.search === '?p=2', { timeout: 2000 });
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.waitForFunction(() => location.pathname === '/' && location.search === '', { timeout: 2000 });
+});
+
 await check('a hidden tab does not fetch; showing it again does', async () => {
   // Compact rows are short, so after page two the bottom is still close and page three would follow.
   await resetStorage({ indexView: 'compact' });
@@ -594,6 +610,19 @@ await check('with the setting off, the plain More link is back and nothing loads
   assert.deepEqual(fetches, []);
   await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.keyboard.press(']')]);
   assert.equal(await here_(), 'news?p=2', '] still opens the next page');
+});
+
+await check('] while the next page loads stays on the page, even where ] could open the next day', async () => {
+  await resetStorage();
+  overrides.set('front?day=2026-11-01&p=2', 'hang');
+  await open('front?day=2026-11-01');
+  await toBottom();
+  await page.waitForSelector('.mg-feed-tail[data-state="loading"]', { timeout: 4000 });
+  await page.keyboard.press(']');
+  await page.keyboard.press(']');
+  await sleep(500);
+  assert.equal(await here_(), 'front?day=2026-11-01', 'no navigation to the next day');
+  assert.deepEqual(fetches, ['front?day=2026-11-01&p=2']);
 });
 
 await check('j past the last story loads the next page', async () => {
@@ -794,6 +823,27 @@ await check('search appends its next page as you scroll, with continued ranks', 
   await sleep(200);
   assert.ok(Math.abs((await page.evaluate(() => scrollY)) - y) <= 2, 'Back restores the scroll offset');
   assert.equal(await page.$eval('.mg-hits .mg-rank', (r) => r.textContent), '1', 'with page one above');
+});
+
+await check('Back restores appended results after typing a search and pressing Enter', async () => {
+  await resetStorage();
+  await open('search');
+  await page.keyboard.type('rust');
+  await page.waitForFunction(() => location.search === '?q=rust' && document.querySelector('.mg-hits .mg-story'), { timeout: 3000 });
+  const length = await page.evaluate(() => history.length);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((n) => history.length === n + 1, { timeout: 2000 }, length).catch(() => assert.fail('Enter pushed a new entry'));
+  await page.evaluate(() => document.activeElement?.blur());
+  await loadNext(1);
+  const hit = await page.$eval('.mg-page-divider', (d) => d.nextElementSibling.querySelector('.mg-story').dataset.id);
+  await page.$eval('.mg-page-divider', (d) => d.scrollIntoView({ block: 'start' }));
+  await page.waitForFunction(() => location.search === '?q=rust&p=2', { timeout: 2000 }).catch(() => assert.fail('the address bar follows page two'));
+  const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem(`margin:feed:${history.state?.marginFeed}`) ?? 'null')?.pages.length ?? 0);
+  assert.equal(saved, 2, 'the entry Enter pushed has its own saved feed');
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click(`[data-id="${hit}"] a[data-mg-comments]`)]);
+  await back();
+  await page.waitForFunction(() => document.querySelectorAll('.mg-hits .mg-rank').length === 40, { timeout: 4000 }).catch(() => assert.fail('both pages restored'));
+  assert.equal(await page.$eval('.mg-hits .mg-rank', (r) => r.textContent), '1', 'page one is back above page two');
 });
 
 await check('a 429 while appending search results shows Retry and waits', async () => {

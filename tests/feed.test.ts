@@ -153,6 +153,8 @@ describe('feed state transitions', () => {
 describe('links and page numbers', () => {
   it('resolves a More link against the page it came from', () => {
     expect(canonical('?p=3', `${HN}news?p=2`)).toBe('news?p=3');
+    expect(canonical(HN, HN)).toBe('');
+    expect(canonical('?p=2', HN)).toBe('?p=2');
     expect(canonical('newest?next=50444876&n=61', `${HN}newest?next=50445284&n=31`)).toBe('newest?next=50444876&n=61');
   });
 
@@ -183,6 +185,12 @@ describe('reading a fetched list page', () => {
     expect(readListPage('stories', 200, doc('synthetic/rate-limited.html'), new URL('news?p=2', HN))).toEqual({ type: 'rate-limited' });
     expect(readListPage('stories', 503, doc('news-p2.html'), new URL('news?p=2', HN))).toEqual({ type: 'rate-limited' });
     expect(readListPage('comments', 429, doc('threads.html'), new URL('threads?id=dang', HN))).toEqual({ type: 'rate-limited' });
+  });
+
+  it('reads a framed page that merely quotes the throttle sentence as a page', () => {
+    const threads = doc('threads-p2.html');
+    threads.querySelector('.commtext')!.append(" Sorry, we're not able to serve your requests this quickly.");
+    expect(readListPage('comments', 200, threads, new URL('threads?id=dang&next=50429394', HN)).type).toBe('page');
   });
 
   it('reports other failures and pages of the wrong shape as errors', () => {

@@ -81,7 +81,10 @@ export const postReply = async (form: ReplyForm, text: string): Promise<Extract<
   return page;
 };
 
-/** HN's answer when it throttles a reader: sometimes a 503, sometimes a 200 holding only this sentence. */
+/**
+ * HN's answer when it throttles a reader: sometimes a 503, sometimes a 200 holding only this sentence, outside
+ * the page frame. Inside a framed page the sentence is just a comment quoting it.
+ */
 const RATE_LIMIT_TEXT = /not able to serve your requests this quickly/i;
 
 export type ListKind = 'stories' | 'comments';
@@ -97,7 +100,8 @@ const LIST_ITEMS: { [K in ListKind]: (page: Page) => { items: FeedItems[K][]; mo
  * `url` is where the page was fetched from; its More link is relative to that page, not to the one on screen.
  */
 export const readListPage = <K extends ListKind>(kind: K, status: number, doc: Document, url: URL): Outcome<FeedItems[K]> => {
-  if (status === 429 || status === 503 || RATE_LIMIT_TEXT.test(doc.body?.textContent ?? '')) return { type: 'rate-limited' };
+  const throttled = !doc.querySelector('#hnmain') && RATE_LIMIT_TEXT.test(doc.body?.textContent ?? '');
+  if (status === 429 || status === 503 || throttled) return { type: 'rate-limited' };
   if (status < 200 || status >= 300) return { type: 'error', message: `Hacker News answered ${status}.` };
   let page: Page;
   try {
