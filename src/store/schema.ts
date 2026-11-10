@@ -38,6 +38,8 @@ export type HistoryEntry = {
   commentCount: number;
   /** Comment ids already rendered on earlier visits. */
   seen: number[];
+  /** Comment ids the reader collapsed in this story's threads, oldest first, at most COLLAPSED_CAP. */
+  collapsed: number[];
 };
 
 export type Bookmark =
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const HISTORY_CAP = 2000;
+export const COLLAPSED_CAP = 200;
 
 export const defaultState = (): State => ({
   version: SCHEMA_VERSION,
@@ -134,8 +137,12 @@ const parseHistoryEntry = (v: unknown): HistoryEntry | null => {
     lastVisit: v.lastVisit,
     commentCount: isNum(v.commentCount) ? v.commentCount : 0,
     seen: Array.isArray(v.seen) ? v.seen.filter(isNum) : [],
+    collapsed: capCollapsed(Array.isArray(v.collapsed) ? v.collapsed.filter(isNum) : []),
   };
 };
+
+/** Distinct ids, keeping the most recently collapsed ones. */
+export const capCollapsed = (ids: readonly number[]): number[] => [...new Set(ids)].slice(-COLLAPSED_CAP);
 
 export const capHistory =(h: Record<string, HistoryEntry>): Record<string, HistoryEntry> => {
   const entries = Object.entries(h);

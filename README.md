@@ -6,7 +6,7 @@ What you get:
 
 - Six themes (system, light, classic, slate, dark, black), three font families, and settings for text size, line height, column width and justified text.
 - Story lists in list, table (choose the columns) or compact view.
-- Comment threads you can collapse by clicking the thread line, inline replies, and badges for comments that are new since your last visit.
+- Comment threads with depth-coloured lines, quote blocks and an indent cap for deep replies. Collapse a thread from its line or header, and it stays collapsed when you come back. Also inline replies, and badges for comments that are new since your last visit.
 - Every account action: vote, unvote, downvote, hide, favorite, flag, edit and delete.
 - A library of your history, bookmarks (stories, comments and people) and highlights, with backup and restore as one JSON file.
 - Profile cards when you hover a username, a selection menu (highlight, quote into your reply, copy, read aloud, search), and keyboard shortcuts. Press `?` on any page to see them.

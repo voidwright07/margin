@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import type { Story } from '../src/hn/types';
-import { newCommentCount, newCommentIds, recordVisit, storyBookmark, toggleBookmark, addHighlight, removeHighlight } from '../src/store/ops';
-import { BackupError, defaultState, HISTORY_CAP, parseBackup, parseState, SCHEMA_VERSION } from '../src/store/schema';
+import { newCommentCount, newCommentIds, recordVisit, saveCollapsed, storyBookmark, toggleBookmark, addHighlight, removeHighlight, forgetVisit } from '../src/store/ops';
+import { BackupError, COLLAPSED_CAP, defaultState, HISTORY_CAP, parseBackup, parseState, SCHEMA_VERSION } from '../src/store/schema';
 
 const story = (id: number, comments: number): Story => ({
   type: 'story', id, rank: 1, title: `Story ${id}`, url: `https://example.com/${id}` as Story['url'], site: 'example.com',
@@ -120,12 +120,42 @@ describe('store module owns chrome.storage.local', () => {
   });
 });
 
-describe('thread settings', () => {
+describe('thread settings and collapsed comments', () => {
   it('validates threadLines, defaulting to rainbow', () => {
     expect(defaultState().settings.threadLines).toBe('rainbow');
     expect(parseState({ settings: { threadLines: 'accent' } }).settings.threadLines).toBe('accent');
     expect(parseState({ settings: { threadLines: 'mono' } }).settings.threadLines).toBe('mono');
     expect(parseState({ settings: { threadLines: 'neon' } }).settings.threadLines).toBe('rainbow');
     expect(parseState({ settings: { threadLines: 3 } }).settings.threadLines).toBe('rainbow');
+  });
+
+  it('keeps collapsed ids on the story history entry across visits', () => {
+    let s = recordVisit(defaultState(), story(1, 3), [10, 11, 12], 1);
+    s = saveCollapsed(s, 1, [11, 10]);
+    expect(s.history['1']!.collapsed).toEqual([11, 10]);
+    s = recordVisit(s, story(1, 4), [10, 11, 12, 13], 2);
+    expect(s.history['1']!.collapsed, 'a later visit keeps them').toEqual([11, 10]);
+    expect(saveCollapsed(s, 1, [11, 10]), 'no change, same state').toBe(s);
+    expect(saveCollapsed(s, 2, [20]), 'no history entry, nothing stored').toBe(s);
+    expect(saveCollapsed(s, 1, []).history['1']!.collapsed).toEqual([]);
+  });
+
+  it('caps collapsed ids, keeping the most recent, at write and at the storage boundary', () => {
+    const many = Array.from({ length: COLLAPSED_CAP + 10 }, (_, i) => i + 1);
+    const s = saveCollapsed(recordVisit(defaultState(), story(1, 0), [], 1), 1, many);
+    expect(s.history['1']!.collapsed).toEqual(many.slice(-COLLAPSED_CAP));
+    const parsed = parseState({ history: { '1': { title: 't', lastVisit: 1, seen: [], collapsed: [...many, 'x', 5, 5] } } });
+    expect(parsed.history['1']!.collapsed).toHaveLength(COLLAPSED_CAP);
+    expect(parsed.history['1']!.collapsed.at(-1)).toBe(COLLAPSED_CAP + 10);
+    expect(parseState({ history: { '1': { title: 't', lastVisit: 1 } } }).history['1']!.collapsed, 'older data').toEqual([]);
+  });
+
+  it('is pruned with history and survives backup and restore', () => {
+    let s = recordVisit(defaultState(), story(1, 1), [10], 1);
+    s = saveCollapsed(s, 1, [10]);
+    expect(parseBackup(JSON.stringify(s)).history['1']!.collapsed).toEqual([10]);
+    expect(forgetVisit(s, 1).history['1']).toBeUndefined();
+    const history = Object.fromEntries(Array.from({ length: HISTORY_CAP + 1 }, (_, i) => [String(i + 1), { title: 't', lastVisit: i, seen: [], collapsed: [i] }]));
+    expect(parseState({ history }).history['1'], 'the oldest entry and its collapsed ids go together').toBeUndefined();
   });
 });

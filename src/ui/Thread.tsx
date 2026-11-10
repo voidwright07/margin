@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Comment, Page } from '../hn/types';
-import { commentBookmark } from '../store/ops';
+import { commentBookmark, saveCollapsed } from '../store/ops';
 import type { Highlight } from '../store/schema';
-import { useStore } from '../store/store';
+import { getState, update, useStore } from '../store/store';
 import { BookmarkButton, UserLink } from './common';
 import { collapsedPreview, markQuotes } from './commentText';
 import { Composer } from './Composer';
@@ -303,7 +303,8 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
   showStory: boolean;
   onPosted: ((page: ItemPage) => void) | null;
 }) {
-  const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
+  // Collapse state persists on the story's history entry; listings span many stories and keep it in memory only.
+  const [collapsed, setCollapsedIds] = useState<ReadonlySet<number>>(() => new Set(itemId === null ? [] : (getState().history[String(itemId)]?.collapsed ?? [])));
   const [reply, setReply] = useState<{ id: number; draft: string } | null>(null);
   const allHighlights = useStore((s) => s.highlights);
   const sizes = useMemo(() => subtreeSizes(comments), [comments]);
@@ -315,6 +316,10 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
   const rows = visibleRows(comments, sizes, collapsed);
   const at = (i: number | null) => (i === null ? null : comments[i]!);
 
+  const setCollapsed = (next: ReadonlySet<number>) => {
+    setCollapsedIds(next);
+    if (itemId !== null) void update((s) => saveCollapsed(s, itemId, [...next]));
+  };
   const toggle = (id: number) => {
     const next = new Set(collapsed);
     if (next.has(id)) next.delete(id);
@@ -344,7 +349,7 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
       document.removeEventListener(QUOTE_EVENT, onQuote);
       document.removeEventListener('margin:collapse-all', onCollapseAll);
     };
-  }, [comments, onPosted]);
+  }, [comments, onPosted, itemId]);
 
   if (comments.length === 0) return null;
 

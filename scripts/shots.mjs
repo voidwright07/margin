@@ -13,6 +13,7 @@ const MOBILE = { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, 
 const DESKTOP = { width: 1280, height: 1000, deviceScaleFactor: 1 };
 
 const SCENES = [];
+const DEEP_IDS = Array.from({ length: 17 }, (_, i) => 9201 + i);
 const both = (name, path, extra = {}) => {
   SCENES.push({ name: `${name}-light`, path, scheme: 'light', ...extra });
   SCENES.push({ name: `${name}-dark`, path, scheme: 'dark', ...extra });
@@ -77,6 +78,8 @@ SCENES.push(
   { name: 'synthetic-deep-capped-dark', path: 'item?id=9200', scheme: 'dark', scrollTo: '[id="9205"]' },
   { name: 'synthetic-deep-preview-light', path: 'item?id=9200', scrollTo: '[id="9206"]', run: async (p) => (await p.hover('[id="9209"] .mg-replyto-btn'), sleep(500)) },
   { name: 'synthetic-deep-preview-dark', path: 'item?id=9200', scheme: 'dark', scrollTo: '[id="9206"]', run: async (p) => (await p.focus('[id="9210"] .mg-replyto-btn'), sleep(200)) },
+  { name: 'synthetic-collapsed-light', path: 'item?id=9200', scrollTo: '.mg-thread-bar', history: { '9200': { title: 'Deep threads', url: '', lastVisit: 1, commentCount: 17, seen: DEEP_IDS, collapsed: [9204, 9213, 9216] } } },
+  { name: 'synthetic-collapsed-dark', path: 'item?id=9200', scheme: 'dark', scrollTo: '.mg-thread-bar', history: { '9200': { title: 'Deep threads', url: '', lastVisit: 1, commentCount: 17, seen: DEEP_IDS, collapsed: [9204, 9213, 9216] } } },
   { name: 'synthetic-quotes-light', path: 'item?id=9200', scrollTo: '[id="9213"]' },
   { name: 'synthetic-quotes-dark', path: 'item?id=9200', scheme: 'dark', scrollTo: '[id="9213"]' },
   { name: 'synthetic-pre-light', path: 'item?id=9200', scrollTo: '[id="9202"]' },

@@ -336,6 +336,20 @@ await check('past depth 6 a comment says who it replies to, and the preview show
   await page.setViewport({ width: 1280, height: 1000 });
 });
 
+await check('collapsed comments stay collapsed after a reload', async () => {
+  await resetStorage();
+  await open('item?id=50442736');
+  await page.click('[id="50443236"] .mg-c-toggle');
+  await page.click('[id="50443986"] .mg-c-toggle');
+  await page.click('[id="50443986"] .mg-c-toggle');
+  await sleep(150);
+  assert.deepEqual((await readStorage()).history['50442736'].collapsed, [50443236]);
+  await open('item?id=50442736');
+  assert.equal(await isCollapsed(50443236), true, 'still collapsed');
+  assert.equal(await isCollapsed(50443986), false);
+  assert.match(await page.$eval('[id="50443236"] .mg-c-preview', (el) => el.textContent), /^“> After a long and expensive battle.*…”$/);
+});
+
 await check('the threadLines setting changes the rail colour', async () => {
   await resetStorage();
   await open('item?id=50442736');

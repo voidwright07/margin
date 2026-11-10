@@ -82,7 +82,7 @@ The captured HTML corrected three details of the first draft:
 `src/store/` holds a single versioned schema in `chrome.storage.local`, with `{ version, settings, history, bookmarks, highlights }`. Backup exports exactly this JSON. Restore validates it at the boundary and migrates by version.
 
 - `settings`: theme (`system|light|classic|slate|dark|black`), font (`sans|serif|mono`), fontSize, columnWidth, lineHeight, justify, indexView (`list|table|compact`), tableColumns, openLinksInNewTab, enabled (old-design toggle), keyboard on/off, threadLines (`rainbow|accent|mono`, the rail colours).
-- `history`: `Record<storyId, { title, url, lastVisit, commentCount, seen: number[] }>` capped by LRU at 2000 stories. `seen` stores the comment ids already rendered on a visit. "New replies" means the ids on the current visit minus `seen`.
+- `history`: `Record<storyId, { title, url, lastVisit, commentCount, seen: number[], collapsed: number[] }>` capped by LRU at 2000 stories. `seen` stores the comment ids already rendered on a visit. "New replies" means the ids on the current visit minus `seen`. `collapsed` holds the comments the reader collapsed in that story's threads (the 200 most recent), so it is capped, pruned, backed up and restored together with its history entry.
 - `bookmarks`: a tagged union `{ type: 'story' | 'comment' | 'user'; id; savedAt; snapshot }`.
 - `highlights`: `{ id, itemId, commentId | null, text, createdAt }`, re-applied by text match inside the target node.
 
@@ -115,6 +115,7 @@ Thread styles live in `src/ui/thread.css`; the structure helpers work on the fla
 - Parent, root and top-level moves come from `navTarget` in `src/ui/threadNav.ts`, a scan over any depth-ordered list. The thread renderer runs it on the comment array. The keyboard runs it on the rendered rows' `data-depth`, which works because collapsing hides only descendants. Comments at depth 1 and deeper get muted `parent` and `root` links in the header, as on HN.
 - A click on bare header space toggles collapse; clicks on links, buttons and inputs, and clicks that end a text selection, do not. A collapsed row is one line: author, age, `[+N]` and a plain-text preview of about 80 characters.
 - Top-level threads are separated by extra space and a hairline. OP comments get a faint accent tint, and the comment being replied to keeps a highlight while its reply box is open.
+- Collapsed ids persist on the story's history entry (see Persistent state), so collapse survives a reload. Listings span many stories and keep collapse in memory only.
 
 ## Feature checklist (ModernHN free + Pro)
 

@@ -1,5 +1,5 @@
 import type { Comment, Story, UserProfile } from '../hn/types';
-import { capHistory, type Bookmark, type HistoryEntry, type Highlight, type State } from './schema';
+import { capCollapsed, capHistory, type Bookmark, type HistoryEntry, type Highlight, type State } from './schema';
 
 /** Pure state transitions. The store applies them; tests call them directly. */
 
@@ -23,8 +23,22 @@ export const recordVisit = (s: State, story: Story, commentIds: number[], now: n
     lastVisit: now,
     commentCount: Math.max(story.comments ?? 0, commentIds.length),
     seen,
+    collapsed: prev?.collapsed ?? [],
   };
   return { ...s, history: capHistory({ ...s.history, [key]: entry }) };
+};
+
+/**
+ * Remember which comments are collapsed in a story's threads. The ids live on the story's history entry, so
+ * they are capped and pruned with history; a story with no history entry keeps nothing.
+ */
+export const saveCollapsed = (s: State, storyId: number, ids: readonly number[]): State => {
+  const key = String(storyId);
+  const prev = s.history[key];
+  if (!prev) return s;
+  const collapsed = capCollapsed(ids);
+  if (collapsed.length === prev.collapsed.length && collapsed.every((id, i) => id === prev.collapsed[i])) return s;
+  return { ...s, history: { ...s.history, [key]: { ...prev, collapsed } } };
 };
 
 export const forgetVisit = (s: State, storyId: number): State => {
