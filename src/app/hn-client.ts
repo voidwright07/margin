@@ -1,6 +1,7 @@
 import { parseReplyForm } from '../hn/item';
 import { parsePage } from '../hn/registry';
 import { parseUserProfile } from '../hn/user';
+import { canonical, type FeedItems, type Outcome } from '../feed/feed';
 import type { Href, Page, ReplyForm, UserProfile } from '../hn/types';
 
 /**
@@ -78,4 +79,47 @@ export const postReply = async (form: ReplyForm, text: string): Promise<Extract<
     throw new HnError(doc.body?.textContent?.trim().slice(0, 200) || 'Hacker News did not accept the comment.');
   }
   return page;
+};
+
+/** HN's answer when it throttles a reader: sometimes a 503, sometimes a 200 holding only this sentence. */
+const RATE_LIMIT_TEXT = /not able to serve your requests this quickly/i;
+
+export type ListKind = 'stories' | 'comments';
+
+/** Each list kind's items, when the parsed page is that kind. */
+const LIST_ITEMS: { [K in ListKind]: (page: Page) => { items: FeedItems[K][]; more: Href | null } | null } = {
+  stories: (page) => (page.kind === 'stories' ? { items: page.stories, more: page.more } : null),
+  comments: (page) => (page.kind === 'comments' ? { items: page.comments, more: page.more } : null),
+};
+
+/**
+ * Turn HN's answer for a list page into the next feed page, parsed by the same registry as a normal page load.
+ * `url` is where the page was fetched from; its More link is relative to that page, not to the one on screen.
+ */
+export const readListPage = <K extends ListKind>(kind: K, status: number, doc: Document, url: URL): Outcome<FeedItems[K]> => {
+  if (status === 429 || status === 503 || RATE_LIMIT_TEXT.test(doc.body?.textContent ?? '')) return { type: 'rate-limited' };
+  if (status < 200 || status >= 300) return { type: 'error', message: `Hacker News answered ${status}.` };
+  let page: Page;
+  try {
+    page = parsePage(doc, url);
+  } catch {
+    page = { kind: 'passthrough', meta: { viewer: null, url, section: null, notice: null } };
+  }
+  const list = LIST_ITEMS[kind](page);
+  if (!list) return { type: 'error', message: 'Margin could not read this page.' };
+  return { type: 'page', items: list.items, next: list.more === null ? null : canonical(list.more, url) };
+};
+
+/** Fetch one more page of a story or comment list. Never throws: every failure is an outcome the feed shows. */
+export const fetchListPage = async <K extends ListKind>(kind: K, href: Href, signal: AbortSignal): Promise<Outcome<FeedItems[K]>> => {
+  const url = abs(href);
+  let res: Response;
+  try {
+    res = await fetch(url, { credentials: 'include', signal });
+  } catch (e) {
+    if (signal.aborted) throw e;
+    return { type: 'error', message: 'Could not reach Hacker News.' };
+  }
+  const html = await res.text();
+  return readListPage(kind, res.status, new DOMParser().parseFromString(html, 'text/html'), new URL(res.url || url.href));
 };

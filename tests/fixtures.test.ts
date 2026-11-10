@@ -238,6 +238,16 @@ const CASES: Case[] = [
     },
   },
   {
+    file: 'synthetic/news-p2-shifted.html', path: 'news?p=2', kind: 'stories',
+    check: storyPage({ count: 30, more: '?p=3', first: { id: 50437790, rank: 31, actions: { upvote: 'vote?id=50437790&how=up&goto=news%3Fp%3D2', hide: 'hide?id=50437790&goto=news%3Fp%3D2' } as Story['actions'] } }),
+  },
+  {
+    file: 'synthetic/rate-limited.html', path: 'news?p=2', kind: 'passthrough',
+    check: (page) => {
+      expect(page.meta.notice).toBe("Sorry, we're not able to serve your requests this quickly.");
+    },
+  },
+  {
     file: 'synthetic/item-loggedin.html', path: 'item?id=9100', kind: 'item',
     check: (page) => {
       const p = as(page, 'item');
