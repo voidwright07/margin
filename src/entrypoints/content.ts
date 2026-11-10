@@ -1,5 +1,11 @@
+import '../ui/tokens.css';
+import '../ui/app.css';
+import { boot } from '../app/boot';
+
 export default defineContentScript({
   matches: ['https://news.ycombinator.com/*'],
   runAt: 'document_start',
-  main() {},
+  main() {
+    void boot();
+  },
 });
