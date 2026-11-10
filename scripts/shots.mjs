@@ -4,6 +4,7 @@
 
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { algoliaRespond, launch, ROOT, sleep } from './harness.mjs';
 
 const OUT = resolve(process.argv[2] ?? join(ROOT, '.cache', 'shots'));
@@ -11,6 +12,25 @@ const FILTER = process.argv[3] ?? '';
 
 const MOBILE = { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true };
 const DESKTOP = { width: 1280, height: 1000, deviceScaleFactor: 1 };
+
+// Infinite scroll: scroll until `count` page dividers show, or until `selector` appears at the bottom.
+const toBottom = (p) => p.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+const loadPages = async (p, count) => {
+  for (let n = 1; n <= count; n++) {
+    await toBottom(p);
+    await p.waitForFunction((k) => document.querySelectorAll('.mg-page-divider').length >= k, { timeout: 5000 }, n);
+  }
+};
+const atBottom = (selector) => async (p) => {
+  await toBottom(p);
+  await p.waitForSelector(selector, { timeout: 5000 });
+  await toBottom(p);
+};
+const divider = async (p) => {
+  await loadPages(p, 1);
+  await p.$eval('.mg-page-divider', (d) => scrollTo(0, d.getBoundingClientRect().top + scrollY - innerHeight / 2));
+};
+const RATE_LIMITED = readFileSync(join(ROOT, 'fixtures', 'synthetic', 'rate-limited.html'), 'utf8');
 
 const SCENES = [];
 const DEEP_IDS = Array.from({ length: 17 }, (_, i) => 9201 + i);
@@ -28,6 +48,10 @@ both('threads', 'threads?id=dang');
 both('user', 'user?id=dang');
 both('login', 'login?goto=news');
 both('news-table', 'news', { settings: { indexView: 'table' } });
+both('feed-divider', 'news', { run: divider });
+both('feed-loading', 'news', { hn: { 'news?p=2': 'hang' }, run: atBottom('.mg-feed-tail[data-state="loading"]') });
+both('feed-rate-limited', 'news', { hn: { 'news?p=2': { status: 200, body: RATE_LIMITED } }, run: atBottom('.mg-feed-notice.is-limited') });
+both('feed-load-more', 'news', { settings: { indexView: 'compact' }, run: async (p) => (await loadPages(p, 10), atBottom('[data-mg-load-more]')(p)) });
 SCENES.push(
   { name: 'news-compact-light', path: 'news', settings: { indexView: 'compact' } },
   { name: 'news-classic', path: 'news', settings: { theme: 'classic' } },
@@ -104,13 +128,25 @@ SCENES.push(
   { name: 'search-mobile-light', path: 'search?q=rust', viewport: MOBILE },
   { name: 'search-mobile-dark', path: 'search?q=rust&type=comment', scheme: 'dark', viewport: MOBILE },
   { name: 'search-typing-dark', path: 'news', scheme: 'dark', run: (p) => p.keyboard.press('/') },
+  { name: 'feed-error-light', path: 'news', hn: { 'news?p=2': { status: 500, body: 'Internal error' } }, run: atBottom('.mg-feed-notice.is-error') },
+  { name: 'feed-table-dark', path: 'news', scheme: 'dark', settings: { indexView: 'table' }, run: divider },
+  { name: 'feed-threads-light', path: 'threads?id=dang', run: divider },
+  { name: 'feed-search-dark', path: 'search?q=rust', scheme: 'dark', run: divider },
   { name: 'news-badges-light', path: 'news', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] }, '50441707': { title: 'x', url: '', lastVisit: 1, commentCount: 140, seen: [] } } },
 );
 
 // A scene can hold Algolia's answer (to show loading) or fail it (to show the error states).
 let algolia = null;
+// A scene can also hold or replace HN's answer for a page that infinite scroll fetches.
+let hn = {};
 const { browser, page, ext, extId, served, warnings, resetStorage, open } = await launch({
   onRequest: async (req, url) => {
+    const answer = url.hostname === 'news.ycombinator.com' ? hn[url.pathname.slice(1) + url.search] : undefined;
+    if (answer === 'hang') return true;
+    if (answer) {
+      await req.respond({ status: answer.status, contentType: 'text/html; charset=utf-8', body: answer.body });
+      return true;
+    }
     if (url.hostname !== 'hn.algolia.com' || algolia === null) return false;
     if (algolia !== 'hang') await algoliaRespond(req, algolia, JSON.stringify({ message: 'error' }));
     return true;
@@ -129,6 +165,7 @@ for (const scene of SCENES.filter((s) => s.name.includes(FILTER))) {
   await page.setViewport(scene.viewport ?? DESKTOP);
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scene.scheme ?? 'light' }]);
   algolia = scene.algolia ?? null;
+  hn = scene.hn ?? {};
   if (scene.visitFirst) await open(scene.visitFirst);
   const mode = await open(scene.path);
   if (scene.scrollTo) await page.$eval(scene.scrollTo, (el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 70)).catch(() => {});
