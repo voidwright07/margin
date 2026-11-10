@@ -7,6 +7,20 @@ import { IconBookmark } from './icons';
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
+export const ago = (ts: number, now = Date.now()): string => {
+  const s = Math.max(0, Math.round((now - ts) / 1000));
+  if (s < 60) return 'just now';
+  const units: Array<[number, string]> = [
+    [60 * 60 * 24 * 365, 'year'],
+    [60 * 60 * 24 * 30, 'month'],
+    [60 * 60 * 24, 'day'],
+    [60 * 60, 'hour'],
+    [60, 'minute'],
+  ];
+  for (const [size, name] of units) if (s >= size) return `${plural(Math.floor(s / size), name)} ago`;
+  return 'just now';
+};
+
 export function UserLink({ name, op }: { name: string; op?: boolean }) {
   return (
     <a class={`mg-user${op ? ' is-op' : ''}`} href={`user?id=${encodeURIComponent(name)}`} data-mg-user={name}>

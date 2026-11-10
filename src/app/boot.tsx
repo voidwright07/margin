@@ -46,6 +46,15 @@ const scrollToHash = () => {
   requestAnimationFrame(() => document.querySelector(`#${ROOT_ID} [id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'start' }));
 };
 
+/** HN's framed pages declare a mobile viewport; its bare "Unknown." page (Margin's search page) does not. */
+const ensureViewport = () => {
+  if (document.querySelector('meta[name="viewport"]')) return;
+  const meta = document.createElement('meta');
+  meta.name = 'viewport';
+  meta.content = 'width=device-width, initial-scale=1';
+  document.head.append(meta);
+};
+
 const fail = (error: unknown) => {
   console.warn('[Margin] could not redesign this page; showing the original.', error);
   page = null;
@@ -71,6 +80,7 @@ const setMode = (next: Mode) => {
   for (const link of hnStylesheets()) link.disabled = next === 'margin';
   switch (next) {
     case 'margin':
+      ensureViewport();
       try {
         render(<App page={page!} onError={fail} />, el);
         scrollToHash();

@@ -26,6 +26,15 @@ const isObject = (v: unknown): v is Raw => typeof v === 'object' && v !== null &
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+const siteOf = (url: string | null): string | null => {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') || null;
+  } catch {
+    return null;
+  }
+};
+
 const parseHit = (h: Raw): StoryHit | CommentHit | null => {
   const id = Number(h.objectID);
   const created = num(h.created_at_i);
@@ -41,11 +50,13 @@ const parseHit = (h: Raw): StoryHit | CommentHit | null => {
   const title = str(h.title);
   if (title === null) return null;
   const text = str(h.story_text);
+  const url = str(h.url);
   return {
     type: 'story',
     id,
     title,
-    url: str(h.url),
+    url,
+    site: siteOf(url),
     author,
     points: num(h.points),
     comments: num(h.num_comments),

@@ -2,25 +2,11 @@ import { useState } from 'preact/hooks';
 import { clearHistory, forgetVisit, removeHighlight, toggleBookmark } from '../store/ops';
 import type { Bookmark } from '../store/schema';
 import { update, useStore } from '../store/store';
-import { plural } from './common';
+import { ago, plural } from './common';
 import { IconClose } from './icons';
 import { usePanel } from './panels';
 
 const HN = 'https://news.ycombinator.com/';
-
-export const ago = (ts: number, now = Date.now()): string => {
-  const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 60) return 'just now';
-  const units: Array<[number, string]> = [
-    [60 * 60 * 24 * 365, 'year'],
-    [60 * 60 * 24 * 30, 'month'],
-    [60 * 60 * 24, 'day'],
-    [60 * 60, 'hour'],
-    [60, 'minute'],
-  ];
-  for (const [size, name] of units) if (s >= size) return `${plural(Math.floor(s / size), name)} ago`;
-  return 'just now';
-};
 
 const host = (url: string) => {
   try {

@@ -1,6 +1,6 @@
 // Shared headless harness: launches Chrome for Testing with the built extension and answers every
-// news.ycombinator.com request from fixtures/ through request interception. It never opens a window and
-// never reaches the network.
+// news.ycombinator.com and hn.algolia.com request from fixtures/ through request interception. It never opens
+// a window and never reaches the network.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -62,6 +62,28 @@ export const ROUTES = {
 
 const fixture = (name) => readFileSync(join(ROOT, 'fixtures', name));
 
+/** Algolia API request -> fixtures/algolia file, chosen from the request the way the real API would vary. */
+export const algoliaFixture = (url) => {
+  const p = url.searchParams;
+  const tags = (p.get('tags') ?? '').split(',');
+  const query = p.get('query') ?? '';
+  if (/hiring/i.test(query)) return 'ask-week.json';
+  if (!/rust/i.test(query)) return 'empty.json';
+  if (tags.includes('comment')) return 'comments-rust.json';
+  if (url.pathname.endsWith('/search_by_date')) return 'stories-rust-bydate.json';
+  if (p.get('page') === '1') return 'stories-rust-p2.json';
+  return 'stories-rust.json';
+};
+
+// hn.algolia.com allows the HN origin; without this header the content script's fetch would fail as it would live.
+const ALGOLIA_HEADERS = { 'access-control-allow-origin': 'https://news.ycombinator.com' };
+export const algoliaRespond = (req, status, body) =>
+  req.respond({ status, contentType: 'application/json; charset=utf-8', headers: ALGOLIA_HEADERS, body });
+
+// A strict page policy on HN's "Unknown." page, so the search checks prove the content script's fetch does not
+// depend on HN's CSP allowing hn.algolia.com.
+const STRICT_CSP = { 'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'" };
+
 /**
  * Launch the browser. `onRequest(req, url)` may answer a request itself (return true) before the fixture
  * router runs; tests use it to observe action and reply requests.
@@ -73,10 +95,11 @@ export const launch = async ({ onRequest } = {}) => {
     headless: true,
     pipe: true,
     enableExtensions: true,
-    args: ['--no-first-run', '--no-default-browser-check', '--disable-gpu', '--renderer-process-limit=2'],
+    // Every host fails DNS, so a request that escapes interception (a new tab, a service worker) cannot go live.
+    args: ['--no-first-run', '--no-default-browser-check', '--disable-gpu', '--renderer-process-limit=2', '--host-resolver-rules=MAP * ~NOTFOUND'],
   });
   const extId = await browser.installExtension(EXT);
-  const served = { fixture: 0, stub: 0, external: 0 };
+  const served = { fixture: 0, algolia: 0, stub: 0, external: 0, popups: [] };
 
   const ext = await browser.newPage();
   await ext.goto(`chrome-extension://${extId}/options.html`);
@@ -95,10 +118,24 @@ export const launch = async ({ onRequest } = {}) => {
   const readStorage = () => ext.evaluate(() => chrome.storage.local.get(null));
 
   const page = await browser.newPage();
+  // A tab opened by the page (window.open, target=_blank) is closed at once: it is not intercepted, and as the
+  // front tab it would pause requestAnimationFrame on the page under test.
+  browser.on('targetcreated', async (t) => {
+    if (t.type() !== 'page' || t.opener() !== page.target()) return;
+    const p = await t.page();
+    if (!p) return;
+    served.popups.push(t.url());
+    await p.close().catch(() => {});
+    await page.bringToFront().catch(() => {});
+  });
   await page.setRequestInterception(true);
   page.on('request', async (req) => {
     const url = new URL(req.url());
     if (onRequest && (await onRequest(req, url))) return;
+    if (url.hostname === 'hn.algolia.com' && url.pathname.startsWith('/api/v1/search')) {
+      served.algolia++;
+      return algoliaRespond(req, 200, readFileSync(join(ROOT, 'fixtures', 'algolia', algoliaFixture(url))));
+    }
     if (url.hostname !== 'news.ycombinator.com') {
       served.external++;
       return req.respond({ status: 204, body: '' });
@@ -112,7 +149,8 @@ export const launch = async ({ onRequest } = {}) => {
     served.stub++;
     const p = url.pathname;
     const type = p.endsWith('.css') ? 'text/css' : p.endsWith('.js') ? 'text/javascript' : p.endsWith('.svg') ? 'image/svg+xml' : p.endsWith('.gif') ? 'image/gif' : 'text/html';
-    return req.respond({ status: type === 'text/html' ? 404 : 200, contentType: type, body: type === 'text/html' ? 'Unknown.' : '' });
+    const html = type === 'text/html';
+    return req.respond({ status: html ? 404 : 200, contentType: type, headers: p === '/search' ? STRICT_CSP : {}, body: html ? 'Unknown.' : '' });
   });
   const warnings = [];
   page.on('console', (m) => {

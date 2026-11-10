@@ -2,6 +2,7 @@ import type { PageMeta, Section } from '../hn/types';
 import { updateSettings, useStore } from '../store/store';
 import { isDarkTheme } from './apply';
 import { IconClassic, IconGear, IconLibrary, IconMoon, IconSun, Logo } from './icons';
+import { SearchField } from './Search';
 import { SettingsPanel } from './SettingsPanel';
 import { usePanel } from './panels';
 
@@ -46,6 +47,7 @@ export function Header({ meta }: { meta: PageMeta }) {
           )}
           <a href="submit" class="mg-tab mg-tab-submit">Submit</a>
         </nav>
+        <SearchField />
         <div class="mg-top-tools">
           {viewer ? (
             <a class="mg-account" href={`user?id=${viewer.name}`} title="Your profile">

@@ -140,6 +140,8 @@ export type StoryHit = {
   title: string;
   /** null for Ask HN and other text posts. */
   url: string | null;
+  /** Host of `url` without "www.", as HN shows it beside a title. */
+  site: string | null;
   author: string;
   points: number | null;
   comments: number | null;
@@ -170,6 +172,8 @@ export type SearchResult = {
 
 export type Page =
   | { kind: 'stories'; meta: PageMeta; stories: Story[]; more: Href | null; heading: string | null }
+  /** Results are not in HN's DOM; the page carries only the query and the UI loads results from Algolia. */
+  | { kind: 'search'; meta: PageMeta; query: SearchQuery }
   | { kind: 'comments'; meta: PageMeta; comments: Comment[]; more: Href | null }
   | {
       kind: 'item';

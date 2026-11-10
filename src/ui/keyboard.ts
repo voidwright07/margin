@@ -90,6 +90,12 @@ const clickPage = (...selectors: string[]) => {
   return false;
 };
 
+export const focusSearch = () => {
+  const input = document.querySelector<HTMLInputElement>('#margin-root [data-mg-search]');
+  input?.focus();
+  input?.select();
+};
+
 export type Command = { keys: string[]; label: string; run: () => void };
 
 export const COMMANDS: Command[] = [
@@ -109,6 +115,7 @@ export const COMMANDS: Command[] = [
   { keys: ['R'], label: 'Reply to the comment', run: () => clickIn('[data-mg-reply]') },
   { keys: [']'], label: 'Next page', run: () => void clickPage('[data-mg-next]', '[data-mg-nextday]') },
   { keys: ['['], label: 'Previous page', run: () => void (clickPage('[data-mg-prev]') || history.back()) },
+  { keys: ['/'], label: 'Search', run: focusSearch },
   { keys: ['g'], label: 'Back to top', run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
   { keys: ['l'], label: 'Open the library', run: () => setPanel(getPanel() === 'library' ? null : 'library') },
   { keys: ['?'], label: 'Show these shortcuts', run: () => setPanel(getPanel() === 'help' ? null : 'help') },

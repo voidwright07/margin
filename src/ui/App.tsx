@@ -1,11 +1,12 @@
 import { Component, type ComponentChildren } from 'preact';
-import type { Page } from '../hn/types';
+import type { Page, SearchQuery } from '../hn/types';
 import { Header } from './Header';
-import { IconSearch } from './icons';
 import { ItemView } from './ItemView';
 import { LibraryDrawer } from './Library';
 import { ControlPad, HelpOverlay, HoverCard, KeyboardLayer, SelectionPopup } from './Overlays';
 import { usePanel } from './panels';
+import { SearchView } from './Search';
+import { SearchContext, useSearchController } from './searchState';
 import { StoryIndex } from './StoryIndex';
 import { Toasts } from './toast';
 import { CommentListing, Passthrough, Profile } from './Views';
@@ -14,6 +15,8 @@ function Main({ page }: { page: Page }) {
   switch (page.kind) {
     case 'stories':
       return <StoryIndex page={page} />;
+    case 'search':
+      return <SearchView />;
     case 'comments':
       return <CommentListing page={page} />;
     case 'item':
@@ -32,10 +35,6 @@ function Main({ page }: { page: Page }) {
 function Footer() {
   return (
     <footer class="mg-foot">
-      <form class="mg-search" method="get" action="https://hn.algolia.com/" role="search">
-        <IconSearch size={15} />
-        <input class="mg-input" type="search" name="q" placeholder="Search Hacker News" aria-label="Search Hacker News on hn.algolia.com" />
-      </form>
       <nav class="mg-foot-links">
         <a href="newsguidelines.html">Guidelines</a>
         <a href="newsfaq.html">FAQ</a>
@@ -68,25 +67,29 @@ function Scrim() {
   return <div class="mg-scrim" onClick={() => setPanel(null)} />;
 }
 
+/** The search page's live state, shared by the top-bar field and the results. */
+function SearchProvider({ query, children }: { query: SearchQuery; children: ComponentChildren }) {
+  return <SearchContext.Provider value={useSearchController(query)}>{children}</SearchContext.Provider>;
+}
+
 export function App({ page, onError, extras }: { page: Page; onError: (e: unknown) => void; extras?: ComponentChildren }) {
-  return (
-    <Guard onError={onError}>
-      <div class={`mg-app mg-kind-${page.kind}`}>
-        <Header meta={page.meta} />
-        <Scrim />
-        <main class="mg-main" id="mg-main">
-          <Main page={page} />
-        </main>
-        <Footer />
-        <LibraryDrawer />
-        <HelpOverlay />
-        <HoverCard />
-        <SelectionPopup />
-        <KeyboardLayer />
-        {page.kind !== 'passthrough' && <ControlPad />}
-        <Toasts />
-        {extras}
-      </div>
-    </Guard>
+  const shell = (
+    <div class={`mg-app mg-kind-${page.kind}`}>
+      <Header meta={page.meta} />
+      <Scrim />
+      <main class="mg-main" id="mg-main">
+        <Main page={page} />
+      </main>
+      <Footer />
+      <LibraryDrawer />
+      <HelpOverlay />
+      <HoverCard />
+      <SelectionPopup />
+      <KeyboardLayer />
+      {page.kind !== 'passthrough' && <ControlPad />}
+      <Toasts />
+      {extras}
+    </div>
   );
+  return <Guard onError={onError}>{page.kind === 'search' ? <SearchProvider query={page.query}>{shell}</SearchProvider> : shell}</Guard>;
 }

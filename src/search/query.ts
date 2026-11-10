@@ -80,6 +80,16 @@ export const toAlgolia = (query: SearchQuery, now: number): string => {
   return url.href;
 };
 
+/** Page links around the current page: always the first and last, two either side, gaps between. */
+export const pageWindow = (page: number, pages: number): Array<number | 'gap'> => {
+  const out: Array<number | 'gap'> = [];
+  for (let n = 1; n <= pages; n++) {
+    if (n === 1 || n === pages || Math.abs(n - page) <= 2) out.push(n);
+    else if (out[out.length - 1] !== 'gap') out.push('gap');
+  }
+  return out;
+};
+
 const WEB_RANGE: Record<SearchRange, string> = { all: 'all', day: 'last24h', week: 'pastWeek', month: 'pastMonth', year: 'pastYear' };
 
 /** The same search on hn.algolia.com's own site, for "Open on Algolia" and for readers using the original design. */

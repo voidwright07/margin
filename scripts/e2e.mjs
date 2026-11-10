@@ -4,13 +4,21 @@
 //   pnpm build:chrome && node scripts/e2e.mjs
 
 import assert from 'node:assert/strict';
-import { launch, sleep } from './harness.mjs';
+import { algoliaRespond, launch, sleep } from './harness.mjs';
 
 const requests = [];
+const algolia = [];
+let algoliaStatus = 200;
 let replyResponse = null;
 
 const { browser, page, resetStorage, readStorage, open, fixture, warnings } = await launch({
   onRequest: async (req, url) => {
+    if (url.hostname === 'hn.algolia.com') {
+      algolia.push(url);
+      if (algoliaStatus === 200) return false;
+      await algoliaRespond(req, algoliaStatus, JSON.stringify({ message: 'Too many requests' }));
+      return true;
+    }
     if (url.hostname !== 'news.ycombinator.com') return false;
     const key = url.pathname.slice(1) + url.search;
     if (/^(vote|fave|hide|flag)\?/.test(key)) {
@@ -36,6 +44,8 @@ const { browser, page, resetStorage, readStorage, open, fixture, warnings } = aw
 const results = [];
 const check = async (name, fn) => {
   requests.length = 0;
+  algolia.length = 0;
+  algoliaStatus = 200;
   try {
     await fn();
     results.push(['ok', name]);
@@ -368,6 +378,179 @@ await check('the threadLines setting changes the rail colour', async () => {
     colours[threadLines] = await rail();
   }
   assert.equal(new Set(Object.values(colours)).size, 3, JSON.stringify(colours));
+});
+
+const API = 'https://hn.algolia.com/api/v1/';
+const here = () => page.evaluate(() => location.pathname.slice(1) + location.search);
+const fieldValue = () => page.$eval('[data-mg-search]', (i) => i.value);
+const firstTitle = () => page.$eval('.mg-hits .mg-title', (a) => a.textContent);
+const settled = () => page.waitForSelector('.mg-hits:not(.is-stale) .mg-story, .mg-search-state:not(.is-idle)', { timeout: 3000 });
+const lastRequest = () => algolia[algolia.length - 1];
+
+await check('typing a query fetches the correct API URL once, after the pause', async () => {
+  await resetStorage();
+  assert.equal(await open('search'), 'margin');
+  assert.equal(await page.evaluate(() => document.activeElement?.hasAttribute('data-mg-search')), true, 'blank search focuses the field');
+  assert.equal(await page.evaluate(() => document.body.innerText.includes('Unknown.')), false, "HN's 404 text is hidden");
+  const before = await page.evaluate(() => history.length);
+  await page.keyboard.type('rust', { delay: 40 });
+  await sleep(150);
+  assert.equal(algolia.length, 0, 'debounced while typing');
+  await page.waitForSelector('.mg-hits .mg-story', { timeout: 3000 });
+  assert.deepEqual(algolia.map((u) => u.href), [`${API}search?query=rust&tags=story`]);
+  assert.equal(await firstTitle(), 'Why Discord is switching from Go to Rust');
+  assert.equal(await page.$eval('.mg-hits .mg-title mark.mg-match', (m) => m.textContent), 'Rust');
+  assert.equal(await page.$eval('.mg-search-summary span', (s) => s.textContent), '61,306 results · page 1 of 50');
+  assert.equal(await here(), 'search?q=rust', 'URL follows the query');
+  assert.equal(await page.evaluate(() => history.length), before, 'typing replaces, never pushes');
+});
+
+await check('type, sort and range change the request', async () => {
+  await resetStorage();
+  await open('search?q=rust');
+  await settled();
+  algolia.length = 0;
+  await page.click('nav[aria-label="Result type"] a:nth-child(2)');
+  await page.waitForSelector('.mg-hits:not(.is-stale) .mg-hit-c', { timeout: 3000 });
+  assert.equal(lastRequest().href, `${API}search?query=rust&tags=comment`);
+  assert.equal(await here(), 'search?q=rust&type=comment');
+  assert.match(await page.$eval('.mg-hit-c .mg-hit-on', (e) => e.textContent), /^on: \S/);
+  await page.click('nav[aria-label="Sort"] a:nth-child(2)');
+  await page.waitForFunction(() => location.search.includes('sort=date'));
+  await settled();
+  assert.equal(lastRequest().pathname, '/api/v1/search_by_date');
+  assert.equal(lastRequest().searchParams.get('tags'), 'comment');
+  await page.click('nav[aria-label="Date range"] a:nth-child(3)');
+  await page.waitForFunction(() => location.search.includes('range=week'));
+  await settled();
+  const since = Number(lastRequest().searchParams.get('numericFilters').match(/^created_at_i>(\d+)$/)[1]);
+  assert.ok(Math.abs(Date.now() / 1000 - 7 * 86400 - since) < 120, `a week ago, got ${since}`);
+  assert.equal(await here(), 'search?q=rust&type=comment&sort=date&range=week');
+  assert.equal(algolia.length, 3);
+});
+
+await check('page 2 requests page=1, from ] and back with [', async () => {
+  await resetStorage();
+  await open('search?q=rust');
+  await settled();
+  await page.keyboard.press(']');
+  await page.waitForFunction(() => location.search.includes('p=2'));
+  await settled();
+  assert.equal(lastRequest().href, `${API}search?query=rust&tags=story&page=1`);
+  assert.equal(await here(), 'search?q=rust&p=2');
+  assert.equal(await page.$eval('.mg-hits .mg-rank', (r) => r.textContent), '21');
+  assert.equal(await page.$eval('.mg-pager a.is-on', (a) => a.textContent), '2');
+  await page.keyboard.press('[');
+  await page.waitForFunction(() => !location.search.includes('p=2'));
+  await settled();
+  assert.equal(await here(), 'search?q=rust');
+  assert.equal(await firstTitle(), 'Why Discord is switching from Go to Rust');
+  assert.equal(algolia.length, 2, 'page one came from the cache');
+  await open('search?q=rust&p=2');
+  await settled();
+  assert.equal(lastRequest().searchParams.get('page'), '1', 'a shared page-2 link loads page 2');
+});
+
+await check('/ focuses the top-bar field from any page, Enter there opens the search page, and help lists /', async () => {
+  await resetStorage();
+  await open('news');
+  await page.keyboard.press('/');
+  assert.equal(await page.evaluate(() => document.activeElement?.hasAttribute('data-mg-search')), true);
+  assert.equal(await fieldValue(), '', 'the slash is not typed');
+  await page.keyboard.type('rust');
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.keyboard.press('Enter')]);
+  await page.waitForFunction(() => document.documentElement.classList.contains('mg-on'));
+  await settled();
+  assert.equal(await here(), 'search?q=rust');
+  assert.equal(await firstTitle(), 'Why Discord is switching from Go to Rust');
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press('?');
+  const help = await page.$$eval('.mg-keys div', (rows) => rows.map((r) => r.textContent));
+  assert.ok(help.includes('/Search'), `help lists /: ${help.join(' | ')}`);
+});
+
+await check('Enter pushes history and Back restores the previous query', async () => {
+  await resetStorage();
+  await open('search?q=rust');
+  await settled();
+  const before = await page.evaluate(() => history.length);
+  await page.keyboard.press('/');
+  await page.keyboard.type('hiring');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => location.search === '?q=hiring');
+  await settled();
+  assert.equal(await page.evaluate(() => history.length), before + 1);
+  assert.match(await firstTitle(), /^Ask HN: How are companies hiring/);
+  await page.evaluate(() => history.back());
+  await page.waitForFunction(() => location.search === '?q=rust');
+  await settled();
+  assert.equal(await fieldValue(), 'rust');
+  assert.equal(await firstTitle(), 'Why Discord is switching from Go to Rust');
+  await page.evaluate(() => history.forward());
+  await page.waitForFunction(() => location.search === '?q=hiring');
+  await settled();
+  assert.equal(await fieldValue(), 'hiring');
+});
+
+await check("the selection popup's Search HN lands on /search?q=", async () => {
+  await resetStorage();
+  await open('item?id=50442736');
+  const selected = await page.evaluate(() => {
+    const el = document.querySelector('[id="50443236"] .mg-commtext');
+    const text = el.querySelector('.mg-quote').lastChild;
+    const range = document.createRange();
+    range.setStart(text, 2);
+    range.setEnd(text, 40);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return getSelection().toString().trim();
+  });
+  await page.waitForSelector('.mg-selpop');
+  const buttons = await page.$$('.mg-selpop button');
+  const labels = await Promise.all(buttons.map((b) => b.evaluate((x) => x.textContent)));
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), buttons[labels.indexOf('Search HN')].click()]);
+  await page.waitForFunction(() => document.documentElement.classList.contains('mg-on'));
+  const url = new URL(page.url());
+  assert.equal(url.origin + url.pathname, 'https://news.ycombinator.com/search');
+  assert.equal(url.searchParams.get('q'), selected);
+  await settled();
+  assert.equal(lastRequest().searchParams.get('query'), selected);
+  assert.match(await page.$eval('.mg-search-state h2', (h) => h.textContent), /^No results for “/);
+});
+
+await check('a 429 shows the rate-limit state, and Try again recovers', async () => {
+  await resetStorage();
+  algoliaStatus = 429;
+  await open('search?q=rust');
+  await page.waitForSelector('.mg-search-state.is-limited', { timeout: 3000 });
+  assert.equal(await page.$eval('.mg-search-state h2', (h) => h.textContent), 'Too many searches for a moment');
+  assert.equal(await page.$eval('.mg-search-state a', (a) => a.href), 'https://hn.algolia.com/?query=rust&type=story&sort=byPopularity&dateRange=all&page=0');
+  algoliaStatus = 200;
+  await page.click('.mg-search-state button');
+  await page.waitForSelector('.mg-hits .mg-story', { timeout: 3000 });
+  assert.equal(await firstTitle(), 'Why Discord is switching from Go to Rust');
+});
+
+await check('story results carry the bookmark action', async () => {
+  await resetStorage();
+  await open('search?q=rust');
+  await settled();
+  await page.keyboard.type('jb');
+  await sleep(150);
+  const { bookmarks } = await readStorage();
+  assert.equal(bookmarks[0].type, 'story');
+  assert.equal(bookmarks[0].id, 22238335);
+  assert.equal(bookmarks[0].snapshot.site, 'blog.discordapp.com');
+});
+
+await check('search results stay text: no markup from the response reaches the page', async () => {
+  await resetStorage();
+  await open('search?q=rust&sort=date');
+  await settled();
+  const tags = await page.$$eval('.mg-hits .mg-hit-text *, .mg-hits .mg-title *', (els) => [...new Set(els.map((e) => e.tagName))]);
+  assert.deepEqual(tags.filter((t) => t !== 'MARK'), []);
+  assert.ok((await page.$$eval('.mg-hit-text', (els) => els.map((e) => e.textContent).join(' '))).includes('<span>'), 'escaped markup shows literally');
 });
 
 for (const [status, line] of results) console.log(`${status.padEnd(4)} ${line}`);

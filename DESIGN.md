@@ -9,7 +9,7 @@ ModernHN shows the new design only on some URLs, so `news?p=2`, `newest?next=…
 ## Stack
 
 - WXT (MV3, builds `chrome-mv3` and `firefox-mv3`), TypeScript strict, Preact, Vitest + linkedom for the parser tests.
-- Permissions: `storage` only. Host permission: `https://news.ycombinator.com/*`. No remote code, no analytics, and all data stays local. This keeps store review simple.
+- Permissions: `storage` only. Host permission: `https://news.ycombinator.com/*`. No remote code, no analytics, and all data stays local. This keeps store review simple. Search reads `hn.algolia.com/api/v1`, which answers the HN origin with `access-control-allow-origin`, so it needs no further permission.
 
 ## Core data shape
 
@@ -50,6 +50,7 @@ type ReplyForm = { action: Href; fields: Record<string, string> /* parent, goto,
 
 type Page =
   | { kind: 'stories';  meta: PageMeta; stories: Story[]; more: Href | null; heading: string | null }
+  | { kind: 'search';   meta: PageMeta; query: SearchQuery }                                   // results load from Algolia, not the DOM
   | { kind: 'comments'; meta: PageMeta; comments: Comment[]; more: Href | null }              // threads, newcomments, bestcomments, favorites&comments=t
   | { kind: 'item';     meta: PageMeta; root: Story | Comment; form: ReplyForm | null; comments: Comment[]; more: Href | null }
   | { kind: 'user';     meta: PageMeta; user: UserProfile }
@@ -63,11 +64,11 @@ The comment list stays flat in document order with `depth`, the same way HN stor
 ```ts
 const detectors: Array<{ kind: Page['kind']; test(doc: Document): boolean; parse(doc, url): Page }> = [
   item (doc has table.fatitem), user (td[timestamp] inside the "user:" row), comments (tr.athing holding td.default),
-  stories (tr.athing.submission), passthrough (fallback, always matches)
+  stories (tr.athing.submission), search (path /search and HN's "Unknown." body), passthrough (fallback, always matches)
 ]
 ```
 
-The first match wins. Adding a page type means adding one entry.
+The first match wins. Adding a page type means adding one entry. `test` also receives the URL, for search only: HN has no search page, so `/search` answers with a bare "Unknown." and the path is the only signal. The detector requires both.
 
 The captured HTML corrected three details of the first draft:
 
@@ -76,6 +77,26 @@ The captured HTML corrected three details of the first draft:
 - On item pages HN writes the `parent` link as a fragment (`#50443236`), so `parentId` on trees comes from the depth stack; on listings the `parent` link's `?id=` wins.
 
 `Story` and `Comment` carry a `type: 'story' | 'comment'` tag so `item.root: Story | Comment` can be narrowed without guessing from fields. `UserProfile` is `{ id, created (unix seconds from td[timestamp]), createdText, karma, about (HTML or null), editable }`; `editable` is true on your own profile, where HN renders the settings form, and the renderer adopts that form into the About tab.
+
+## Search
+
+HN's own search lives on hn.algolia.com. Margin keeps it inside the redesign on `news.ycombinator.com/search?…`.
+
+```ts
+type SearchQuery = {
+  q: string; type: 'story'|'comment'|'ask_hn'|'show_hn'|'job'|'all'; sort: 'popularity'|'date'
+  range: 'all'|'day'|'week'|'month'|'year'; page: number /* 1-based, like ?p= */; author: string | null; site: string | null
+}
+type SearchResult = { hits: Array<StoryHit | CommentHit>; total: number; page: number /* 1-based */; pages: number }
+```
+
+- `src/search/query.ts` holds the pure parts. `parseQuery(searchParams)` fills defaults for anything missing or invalid. `toUrl(query)` writes Margin's URL with defaults left out, so links are short and shareable. `toAlgolia(query, now)` writes the API request: `search` or `search_by_date`, a type tag plus `author_<name>`, `numericFilters=created_at_i>…` for a range, `page` counted from 0, and `restrictSearchableAttributes=url` with the site in the query text for a site filter. `toAlgoliaWeb(query)` links the same search on hn.algolia.com.
+- `src/search/response.ts` is the API boundary. It checks the envelope, reads each hit into a `StoryHit` or `CommentHit`, and drops hits it cannot show. `comment_text` and `story_text` become plain text there (paragraphs kept, tags dropped, entities decoded). Results render as text nodes only: no response HTML is ever parsed on the page. Comment excerpts are clamped to a few lines, so HN's italics and links add little, and text-only rendering keeps markup from a third-party service out of the page.
+- `src/search/match.ts` highlights terms itself. It splits text into segments at word-start matches of the query's words, and the UI wraps matches in `<mark>`. Algolia's `_highlightResult` HTML is never used.
+- `src/ui/searchState.ts` is the page's controller, shared through a context by the top-bar field and the results. Loading is a union: `idle | loading (with the previous results, shown dimmed) | ready | failed (rate-limited | http | network | bad-response)`. Results are cached per URL for the page's lifetime, so Back and `[` are instant and Algolia sees fewer requests.
+- History: typing updates the field at once, then after 300 ms replaces the current entry's URL and searches. Enter, a filter and a page link push an entry. Before pushing, the controller restores the last deliberate URL on the current entry, so Back returns to the previous search and never to a half-typed draft. `popstate` reparses the URL.
+- Story hits render through the same `StoryRow` as story lists, so they get the bookmark action, visited state and new-comment badges. Comment hits show author, age (linking to the comment), "on:" the story, and the clamped text.
+- The search page hides HN's loose "Unknown." text node with the same adopt-and-restore helper passthrough pages use, and `boot.tsx` adds a mobile viewport meta when a page has none, as that 404 page does not.
 
 ## Persistent state
 
@@ -121,12 +142,12 @@ Thread styles live in `src/ui/thread.css`; the structure helpers work on the fla
 
 Free: themes, fonts, styles (width, line height, justify), history page/panel, inline reply and collapsible threads, list/table index with configurable columns, redesigned profile with tabs (about / submissions / comments / favorites), every account action, one-click old-design toggle.
 
-Pro (free here): bookmarks (stories, comments, users) and a bookmarks panel; highlighter; new-reply badges on story rows plus jumping between new comments; user hover card (reuses the user parser on a same-origin `user?id=` fetch, cached, 400 ms hover delay); selection popup (highlight, quote into reply, copy, speak via `speechSynthesis`, search HN via `hn.algolia.com`); control pad with keyboard shortcuts (`j/k` move, `Shift+J`/`Shift+K` next/prev top-level comment, `h` parent, `r` thread root, `n/p` next/prev new comment, `R` reply, `[`/`]` page, `o` open, `c` comments, `u` upvote, `b` bookmark, `x` collapse, `?` help); date picker for `front?day=`; backup and restore as JSON.
+Pro (free here): bookmarks (stories, comments, users) and a bookmarks panel; highlighter; new-reply badges on story rows plus jumping between new comments; user hover card (reuses the user parser on a same-origin `user?id=` fetch, cached, 400 ms hover delay); selection popup (highlight, quote into reply, copy, speak via `speechSynthesis`, search HN on Margin's search page); control pad with keyboard shortcuts (`j/k` move, `Shift+J`/`Shift+K` next/prev top-level comment, `h` parent, `r` thread root, `n/p` next/prev new comment, `R` reply, `[`/`]` page, `o` open, `c` comments, `u` upvote, `b` bookmark, `x` collapse, `/` search, `?` help); date picker for `front?day=`; backup and restore as JSON.
 
-Beyond ModernHN: every list and comment page in its paginated forms, plus `item?id=…&p=N` comment pagination.
+Beyond ModernHN: every list and comment page in its paginated forms, plus `item?id=…&p=N` comment pagination, and native search in the top bar with type, sort and date filters.
 
 ## Verification
 
 - `pnpm test`: the fixture suite in `fixtures/` (real HN HTML, captured 2026-11-10). Every fixture must route to its expected `kind` and parse non-empty, correct data. A table in the test maps each fixture to its kind. `fixtures/synthetic/` holds labelled synthetic pages for states the capture lacks; `item-deep.html` (a thread ten levels deep, with quotes and a `<pre>` block) is generated by `scripts/synthetic-deep.mjs`.
-- `pnpm e2e` (`scripts/e2e.mjs`): headless behaviour checks on the built extension against fixtures, asserting the exact requests sent for votes, favorites and replies, plus keys, history, highlights and the old-design toggle.
+- `pnpm e2e` (`scripts/e2e.mjs`): headless behaviour checks on the built extension against fixtures, asserting the exact requests sent for votes, favorites and replies, plus keys, history, highlights and the old-design toggle. The harness answers `hn.algolia.com/api/v1` from `fixtures/algolia/` (real responses captured 2026-11-10) with the CORS header the real API sends, and serves `/search` under a strict page CSP. The search checks assert the exact API URLs for typing, filters and pages, history push and Back, `/`, the selection popup and the 429 state.
 - Visual check: a headless Puppeteer script (Chrome for Testing, `headless: true`, extension loaded) serves fixtures through request interception for `news.ycombinator.com` and writes screenshots to a scratch directory for review. **It must never open a visible window** (the user's standing rule). Keep live requests to HN at a minimum, because HN rate-limits.

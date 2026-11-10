@@ -1328,21 +1328,6 @@ html.mg-on body > center {
   border-top: 1px solid var(--rule);
   font-family: var(--mg-font-sans);
 }
-.mg-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: min(100%, 360px);
-  color: var(--faint);
-}
-.mg-search svg {
-  position: absolute;
-  left: 11px;
-}
-.mg-search .mg-input {
-  width: 100%;
-  padding-left: 32px;
-}
 .mg-foot-links {
   display: flex;
   flex-wrap: wrap;
@@ -1841,4 +1826,317 @@ html.mg-raw .rank {
 }
 .mg-selpop button:first-child {
   color: var(--accent-ink);
+}
+
+/* ---------- search ---------- */
+
+.mg-hidden {
+  display: none;
+}
+
+.mg-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 4 220px;
+  min-width: 120px;
+  margin: 0 0 0 auto;
+  color: var(--faint);
+}
+.mg-search > svg {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+}
+.mg-search .mg-input {
+  width: 100%;
+  padding: 0 32px 0 31px;
+  border-color: transparent;
+  background: var(--bg-soft);
+}
+.mg-search .mg-input:hover {
+  border-color: var(--rule-strong);
+}
+.mg-search .mg-input:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+.mg-search .mg-input::placeholder {
+  color: var(--faint);
+}
+.mg-app .mg-search-key {
+  position: absolute;
+  right: 7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-bottom-width: 1px;
+  background: var(--bg);
+  color: var(--faint);
+  font-size: 11px;
+  pointer-events: none;
+}
+.mg-search:focus-within .mg-search-key,
+.mg-search .mg-input:not(:placeholder-shown) ~ .mg-search-key {
+  display: none;
+}
+
+.mg-search-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  margin: 2px 0 14px;
+}
+.mg-search-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+.mg-search-seg {
+  display: inline-flex;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mg-search-seg a {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 6px;
+  color: var(--muted) !important;
+  font: 500 13px var(--mg-font-sans);
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.mg-search-seg a:hover {
+  color: var(--ink) !important;
+}
+.mg-search-seg a.is-on {
+  background: var(--bg-elev);
+  color: var(--ink) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--rule);
+}
+.mg-search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 14px;
+}
+.mg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 11px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink) !important;
+  font: 500 12.5px var(--mg-font-sans);
+}
+.mg-chip:hover {
+  filter: brightness(0.97);
+}
+.mg-search-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  min-height: 31px;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--muted);
+  font: 13px var(--mg-font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.mg-search-summary a {
+  color: var(--muted) !important;
+  white-space: nowrap;
+}
+.mg-search-summary a:hover {
+  color: var(--ink) !important;
+}
+.mg-hits {
+  margin-top: 6px;
+  transition: opacity 0.2s ease;
+}
+.mg-hits.is-stale {
+  opacity: 0.45;
+}
+.mg-hits > li + li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  border-top: 1px solid var(--rule);
+}
+.mg-hits > li[data-mg-focused]::before,
+.mg-hits > li[data-mg-focused] + li::before {
+  border-color: transparent;
+}
+.mg-app mark.mg-match {
+  background: none;
+  color: inherit;
+  font-weight: 600;
+  box-shadow: inset 0 -0.38em 0 color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.mg-hit-glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--faint);
+}
+.mg-hit-c .mg-meta {
+  margin-top: 3px;
+}
+.mg-hit-on {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mg-meta .mg-hit-on a {
+  color: var(--ink-2);
+}
+.mg-meta .mg-hit-on a:hover {
+  color: var(--accent-ink);
+}
+.mg-hit-text {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  color: var(--ink-2);
+  font-size: calc(var(--mg-fs) * 0.95);
+  line-height: 1.55;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.mg-hit-text-story {
+  margin-top: 3px;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.mg-hits-skeleton {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.mg-hits-skeleton li {
+  display: grid;
+  gap: 9px;
+  padding: 16px 0 16px 58px;
+  border-bottom: 1px solid var(--rule);
+}
+.mg-skel-line {
+  display: block;
+  width: 68%;
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-soft), var(--bg-hover), var(--bg-soft));
+  background-size: 200% 100%;
+  animation: mg-shimmer 1.2s linear infinite;
+}
+.mg-skel-line.is-short {
+  width: 36%;
+  height: 10px;
+}
+.mg-hits-skeleton li:nth-child(even) .mg-skel-line:first-child {
+  width: 54%;
+}
+.mg-search-state {
+  padding: 64px 16px 48px;
+  text-align: center;
+  font-family: var(--mg-font-sans);
+}
+.mg-search-state h2 {
+  margin: 0 0 6px;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.mg-search-state p {
+  max-width: 440px;
+  margin: 0 auto;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.mg-search-state kbd {
+  margin: 0 2px;
+}
+.mg-search-state-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+.mg-search-state-acts:empty {
+  display: none;
+}
+.mg-pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin-top: 28px;
+  font: 500 13px var(--mg-font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.mg-pager a,
+.mg-pager span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--mg-radius);
+  color: var(--muted) !important;
+}
+.mg-pager a:hover {
+  background: var(--bg-hover);
+  color: var(--ink) !important;
+}
+.mg-pager a.is-on {
+  background: var(--ink);
+  color: var(--bg) !important;
+}
+.mg-pager .mg-pager-step {
+  padding: 0 10px;
+}
+.mg-pager .is-disabled {
+  opacity: 0.4;
+}
+.mg-pager-gap {
+  min-width: 20px;
+}
+@media (max-width: 760px) {
+  .mg-search {
+    order: 2;
+    flex: 1 1 0;
+    min-width: 0;
+    margin-left: 4px;
+  }
+  .mg-search .mg-input {
+    padding-right: 8px;
+  }
+  .mg-app .mg-search-key {
+    display: none;
+  }
+  .mg-top-tools {
+    order: 2;
+    margin-left: 0;
+  }
 }

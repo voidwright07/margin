@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import type { Page, Story } from '../hn/types';
 import { newCommentCount, storyBookmark } from '../store/ops';
@@ -6,6 +7,7 @@ import { useStore } from '../store/store';
 import { BookmarkButton, MoreLink, plural, profileTabFor, ProfileTabs, UserLink } from './common';
 import { FrontDayNav } from './FrontDayNav';
 import { IconComment, IconUp } from './icons';
+import { Marked } from './Marked';
 import { useHnToggle } from './useToggle';
 
 type StoriesPage = Extract<Page, { kind: 'stories' }>;
@@ -37,8 +39,7 @@ export function VoteButton({ vote, compact }: { vote: Vote; compact?: boolean })
   );
 }
 
-
-function TitleLink({ story, newTab }: { story: Story; newTab: boolean }) {
+function TitleLink({ story, newTab, terms }: { story: Story; newTab: boolean; terms?: string[] }) {
   const external = /^https?:/.test(story.url);
   return (
     <a
@@ -48,7 +49,7 @@ function TitleLink({ story, newTab }: { story: Story; newTab: boolean }) {
       target={external && newTab ? '_blank' : undefined}
       rel={external ? 'noopener' : undefined}
     >
-      {story.title}
+      {terms ? <Marked text={story.title} terms={terms} /> : story.title}
     </a>
   );
 }
@@ -73,7 +74,15 @@ function HideButton({ story, onHidden }: { story: Story; onHidden: () => void })
   );
 }
 
-function StoryRow({ story, newTab, entry, onHidden }: { story: Story; newTab: boolean; entry: HistoryEntry | undefined; onHidden: () => void }) {
+/** One story in list view. Search results reuse it with the query's terms marked and an excerpt as children. */
+export function StoryRow({ story, newTab, entry, onHidden, terms, children }: {
+  story: Story;
+  newTab: boolean;
+  entry: HistoryEntry | undefined;
+  onHidden: () => void;
+  terms?: string[];
+  children?: ComponentChildren;
+}) {
   const comments = commentsLabel(story.comments);
   const { vote, score } = useStoryVote(story);
   return (
@@ -85,13 +94,14 @@ function StoryRow({ story, newTab, entry, onHidden }: { story: Story; newTab: bo
       <div class="mg-story-main">
         <div class="mg-titleline">
           {(story.flagged || story.dead) && <span class="mg-flag-tag">{story.dead ? 'dead' : 'flagged'}</span>}
-          <TitleLink story={story} newTab={newTab} />
+          <TitleLink story={story} newTab={newTab} terms={terms} />
           {story.site && (
             <a class="mg-site" href={`from?site=${story.site}`}>
               {story.site}
             </a>
           )}
         </div>
+        {children}
         <div class="mg-meta">
           {score !== null && <span>{plural(score, 'point')}</span>}
           {story.by && (

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { fetchUser } from '../app/hn-client';
 import type { UserProfile } from '../hn/types';
+import { DEFAULT_QUERY, toUrl } from '../search/query';
 import { addHighlight, removeHighlight } from '../store/ops';
 import { update, useStore } from '../store/store';
 import { plural } from './common';
@@ -261,8 +262,8 @@ export function SelectionPopup() {
     [
       'Search HN',
       () => {
-        window.open(`https://hn.algolia.com/?q=${encodeURIComponent(sel.text.slice(0, 200))}`, '_blank', 'noopener');
         done();
+        location.assign(toUrl({ ...DEFAULT_QUERY, q: sel.text.slice(0, 200) }));
       },
     ],
   ];

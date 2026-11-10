@@ -1,9 +1,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseHTML } from 'linkedom';
 import { describe, expect, it } from 'vitest';
+import { parsePage } from '../src/hn/registry';
 import type { SearchQuery } from '../src/hn/types';
 import { excerptAt, markTerms, searchTerms } from '../src/search/match';
-import { DEFAULT_QUERY, parseQuery, toAlgolia, toAlgoliaWeb, toUrl } from '../src/search/query';
+import { DEFAULT_QUERY, pageWindow, parseQuery, toAlgolia, toAlgoliaWeb, toUrl } from '../src/search/query';
 import { BadResponse, htmlToText, parseSearchResponse } from '../src/search/response';
 
 const HN = 'https://news.ycombinator.com/';
@@ -11,6 +13,22 @@ const ALGOLIA = join(import.meta.dirname, '..', 'fixtures', 'algolia');
 const fromUrl = (href: string) => parseQuery(new URL(href, HN).searchParams);
 const q = (patch: Partial<SearchQuery>): SearchQuery => ({ ...DEFAULT_QUERY, ...patch });
 const raw = (name: string) => JSON.parse(readFileSync(join(ALGOLIA, name), 'utf8')) as { hits: Array<Record<string, unknown>>; nbHits: number; nbPages: number; page: number; params: string };
+
+describe('search route', () => {
+  const page = (html: string, path: string) => parsePage(parseHTML(html).document as unknown as Document, new URL(path, HN));
+
+  it('is /search answered with HN\'s "Unknown." page, and carries the parsed query', () => {
+    const p = page('<html><head></head><body>Unknown.</body></html>', 'search?q=rust&type=comment&p=2');
+    expect(p.kind).toBe('search');
+    expect(p.kind === 'search' && p.query).toEqual(q({ q: 'rust', type: 'comment', page: 2 }));
+  });
+
+  it('needs both the path and the body', () => {
+    expect(page('<html><body>Unknown.</body></html>', 'item?id=1').kind).toBe('passthrough');
+    expect(page('<html><body>Something else</body></html>', 'search?q=x').kind).toBe('passthrough');
+    expect(page(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'news.html'), 'utf8'), 'search?q=x').kind).toBe('stories');
+  });
+});
 
 describe('SearchQuery parsing', () => {
   it('fills every default for a bare /search', () => {
@@ -55,6 +73,16 @@ describe('toUrl', () => {
 
   it('round-trips into the same Algolia request', () => {
     for (const s of samples) expect(toAlgolia(fromUrl(toUrl(s)), 1_800_000_000)).toBe(toAlgolia(s, 1_800_000_000));
+  });
+});
+
+describe('pageWindow', () => {
+  it('shows the ends and two pages either side, with gaps', () => {
+    expect(pageWindow(1, 1)).toEqual([1]);
+    expect(pageWindow(1, 50)).toEqual([1, 2, 3, 'gap', 50]);
+    expect(pageWindow(6, 50)).toEqual([1, 'gap', 4, 5, 6, 7, 8, 'gap', 50]);
+    expect(pageWindow(4, 6)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(pageWindow(50, 50)).toEqual([1, 'gap', 48, 49, 50]);
   });
 });
 
@@ -129,11 +157,11 @@ describe('search response parsing', () => {
     const [discord] = parseSearchResponse(raw('stories-rust.json')).hits;
     expect(discord).toEqual({
       type: 'story', id: 22238335, title: 'Why Discord is switching from Go to Rust',
-      url: 'https://blog.discordapp.com/why-discord-is-switching-from-go-to-rust-a190bbca2b1f',
+      url: 'https://blog.discordapp.com/why-discord-is-switching-from-go-to-rust-a190bbca2b1f', site: 'blog.discordapp.com',
       author: 'Sikul', points: 1582, comments: 642, created: 1580837440, text: null,
     });
     const ask = parseSearchResponse(raw('ask-week.json')).hits[0]!;
-    expect(ask).toMatchObject({ type: 'story', url: null, title: 'Ask HN: How are companies hiring developers nowadays?' });
+    expect(ask).toMatchObject({ type: 'story', url: null, site: null, title: 'Ask HN: How are companies hiring developers nowadays?' });
     expect(ask.type === 'story' && ask.text).toMatch(/^Hi, using a throwaway[\s\S]*\n\nSince it's been a while/);
   });
 

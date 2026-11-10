@@ -9,12 +9,13 @@ What you get:
 - Comment threads with depth-coloured lines, quote blocks and an indent cap for deep replies. Collapse a thread from its line or header, and it stays collapsed when you come back. Also inline replies, and badges for comments that are new since your last visit.
 - Every account action: vote, unvote, downvote, hide, favorite, flag, edit and delete.
 - A library of your history, bookmarks (stories, comments and people) and highlights, with backup and restore as one JSON file.
+- Search from the top bar (press `/`): stories, comments, Ask HN, Show HN and jobs, sorted by popularity or date, over any time range, with matches marked and results that stay in the redesign.
 - Profile cards when you hover a username, a selection menu (highlight, quote into your reply, copy, read aloud, search), and keyboard shortcuts. Press `?` on any page to see them.
 - One click back to the original design, and one click to return.
 
 ## Privacy
 
-Margin stores everything in your browser's extension storage (`chrome.storage.local`). It has no server, no analytics and no remote code. The only network requests it makes go to `news.ycombinator.com`, with your existing HN session, for the same actions HN's own links perform: votes, favorites, hides, flags, replies, and the profile shown in a hover card. Links you click go where they point, as they would without the extension.
+Margin stores everything in your browser's extension storage (`chrome.storage.local`). It has no server, no analytics and no remote code. It makes network requests to two places. Requests to `news.ycombinator.com` use your existing HN session, for the same actions HN's own links perform: votes, favorites, hides, flags, replies, and the profile shown in a hover card. When you search, your search words and filters go to `hn.algolia.com`, the search service HN itself links to, without cookies or any other data. Links you click go where they point, as they would without the extension.
 
 The extension asks for one permission, `storage`, and access to `https://news.ycombinator.com/*`.
 
@@ -58,17 +59,17 @@ Before you publish to addons.mozilla.org, replace the placeholder Gecko id in `w
 
 ## Headless checks
 
-These scripts run Chrome for Testing headless with the built extension. They answer every `news.ycombinator.com` request from `fixtures/`, so they never contact HN and never open a window.
+These scripts run Chrome for Testing headless with the built extension. They answer every `news.ycombinator.com` request from `fixtures/` and every `hn.algolia.com` search from `fixtures/algolia/`, so they never contact HN or Algolia and never open a window.
 
 ```sh
 pnpm dlx @puppeteer/browsers install chrome@stable --path .cache/browsers
 pnpm build:chrome
-pnpm e2e                         # behaviour checks: votes, replies, keys, history, highlights, toggle
+pnpm e2e                         # behaviour checks: votes, replies, keys, history, highlights, toggle, search
 node scripts/shots.mjs [outDir]  # screenshots of each page kind in each theme
 ```
 
 ## How it works
 
-`src/hn/` turns an HN page into one typed `Page` value. A registry of detectors picks the parser from the DOM shape (`table.fatitem`, the profile table, comment rows, story rows), so any URL that produces a known shape gets the new design. `src/ui/` renders that value with Preact, and `src/store/` is the only code that reads or writes extension storage. See `DESIGN.md` for the data shapes and the runtime flow.
+`src/hn/` turns an HN page into one typed `Page` value. A registry of detectors picks the parser from the DOM shape (`table.fatitem`, the profile table, comment rows, story rows), so any URL that produces a known shape gets the new design. `src/ui/` renders that value with Preact, and `src/store/` is the only code that reads or writes extension storage. `src/search/` turns a search URL into an Algolia request and the response into results. See `DESIGN.md` for the data shapes and the runtime flow.
 
 Hacker News is a trademark of Y Combinator. Margin is not affiliated with Y Combinator.
