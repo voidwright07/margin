@@ -115,6 +115,59 @@ export type UserProfile = {
   editable: boolean;
 };
 
+export const SEARCH_TYPES = ['story', 'comment', 'ask_hn', 'show_hn', 'job', 'all'] as const;
+export const SEARCH_SORTS = ['popularity', 'date'] as const;
+export const SEARCH_RANGES = ['all', 'day', 'week', 'month', 'year'] as const;
+export type SearchType = (typeof SEARCH_TYPES)[number];
+export type SearchSort = (typeof SEARCH_SORTS)[number];
+export type SearchRange = (typeof SEARCH_RANGES)[number];
+
+/** Everything the search page shows, as Margin's own `search?…` URL carries it. */
+export type SearchQuery = {
+  q: string;
+  type: SearchType;
+  sort: SearchSort;
+  range: SearchRange;
+  /** 1-based, like HN's own `?p=`. Only the Algolia boundary counts from 0. */
+  page: number;
+  author: string | null;
+  site: string | null;
+};
+
+export type StoryHit = {
+  type: 'story';
+  id: number;
+  title: string;
+  /** null for Ask HN and other text posts. */
+  url: string | null;
+  author: string;
+  points: number | null;
+  comments: number | null;
+  /** Unix seconds. */
+  created: number;
+  /** story_text as plain text, null when the story has none. */
+  text: string | null;
+};
+
+export type CommentHit = {
+  type: 'comment';
+  id: number;
+  author: string;
+  created: number;
+  /** comment_text as plain text. */
+  text: string;
+  storyId: number;
+  storyTitle: string | null;
+};
+
+export type SearchResult = {
+  hits: Array<StoryHit | CommentHit>;
+  total: number;
+  /** 1-based. */
+  page: number;
+  pages: number;
+};
+
 export type Page =
   | { kind: 'stories'; meta: PageMeta; stories: Story[]; more: Href | null; heading: string | null }
   | { kind: 'comments'; meta: PageMeta; comments: Comment[]; more: Href | null }
