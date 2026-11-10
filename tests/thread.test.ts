@@ -6,14 +6,18 @@ import { parsePage } from '../src/hn/registry';
 import type { Comment, PageMeta } from '../src/hn/types';
 import { frontDay } from '../src/ui/FrontDayNav';
 import { applyHighlights } from '../src/ui/highlight';
+import { markQuotes } from '../src/ui/commentText';
 import { subtreeSizes, visibleRows } from '../src/ui/Thread';
 
+const itemDoc = () => parseHTML(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'item.html'), 'utf8')).document as unknown as Document;
+
 const itemComments = (): Comment[] => {
-  const { document } = parseHTML(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'item.html'), 'utf8'));
-  const page = parsePage(document as unknown as Document, new URL('https://news.ycombinator.com/item?id=50442736'));
+  const page = parsePage(itemDoc(), new URL('https://news.ycombinator.com/item?id=50442736'));
   if (page.kind !== 'item') throw new Error('expected item');
   return page.comments;
 };
+
+const blankDoc = () => parseHTML('<html><body></body></html>').document as unknown as Document;
 
 describe('collapsing works on the flat comment array', () => {
   const comments = itemComments();
@@ -61,5 +65,43 @@ describe('highlights re-apply by text match', () => {
     const marks = [...el.querySelectorAll('mark')].map((m) => m.textContent);
     expect(marks).toEqual(['lo ', 'brave']);
     expect(el.textContent).toBe('Hello brave new world');
+  });
+});
+
+describe('quote blocks come from the rendered comment DOM', () => {
+  const render = (html: string) => {
+    const el = blankDoc().createElement('div');
+    el.innerHTML = html;
+    const before = el.innerHTML;
+    markQuotes(el);
+    return { el, before };
+  };
+
+  it('marks the bare first paragraph and later paragraphs that start with ">"', () => {
+    const { el } = render('&gt; quoted first<p>my reply</p><p>&gt; <i>second</i> quote</p>');
+    const quotes = Array.from(el.querySelectorAll('.mg-quote'));
+    expect(quotes.map((q) => q.textContent)).toEqual(['> quoted first', '> second quote']);
+    expect(quotes.map((q) => Array.from(q.querySelectorAll('.mg-quote-mark'), (m) => m.textContent).join(''))).toEqual(['> ', '> ']);
+    expect(el.querySelector('p:not(.mg-quote)')?.textContent).toBe('my reply');
+    expect(el.textContent, 'text is unchanged, so highlights still match').toBe('> quoted firstmy reply> second quote');
+  });
+
+  it('leaves <pre>, and ">" that does not start a paragraph, untouched', () => {
+    const { el, before } = render('a &gt; b<p>x</p><pre><code>&gt; not a quote\n  indented</code></pre>');
+    expect(el.querySelector('.mg-quote')).toBeNull();
+    expect(el.innerHTML).toBe(before);
+  });
+
+  it('highlights still apply inside a quote', () => {
+    const { el } = render('&gt; quoted first<p>my reply</p>');
+    applyHighlights(el as unknown as HTMLElement, [{ id: 'h1', text: 'quoted first' }]);
+    expect(el.querySelector('.mg-quote mark.mg-hl')?.textContent).toBe('quoted first');
+  });
+
+  it('finds the quote HN rendered in the item fixture', () => {
+    const { el } = render(itemComments()[0]!.html);
+    const quotes = Array.from(el.querySelectorAll('.mg-quote'));
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]!.textContent).toMatch(/^> After a long and expensive battle/);
   });
 });

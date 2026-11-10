@@ -165,7 +165,8 @@ await check('highlight from a selection persists and re-applies on reload', asyn
   await open('item?id=50442736');
   await page.evaluate(() => {
     const el = document.querySelector('[id="50443236"] .mg-commtext');
-    const text = el.firstChild;
+    // The first paragraph is an HN quote; the selection is inside the rendered quote block.
+    const text = el.querySelector('.mg-quote').lastChild;
     const range = document.createRange();
     range.setStart(text, 2);
     range.setEnd(text, 40);

@@ -4,6 +4,7 @@ import { commentBookmark } from '../store/ops';
 import type { Highlight } from '../store/schema';
 import { useStore } from '../store/store';
 import { BookmarkButton, UserLink } from './common';
+import { markQuotes } from './commentText';
 import { Composer } from './Composer';
 import { applyHighlights } from './highlight';
 import { IconDown, IconUp } from './icons';
@@ -63,6 +64,7 @@ export function CommentBody({ comment, highlights, itemId, canQuote }: { comment
   useLayoutEffect(() => {
     const el = ref.current!;
     el.innerHTML = comment.html;
+    markQuotes(el);
     applyHighlights(el, highlights);
   }, [comment.html, highlights]);
   return <div ref={ref} class="mg-commtext" data-mg-text data-comment-id={comment.id} data-item-id={itemId} data-can-quote={String(canQuote)} />;

@@ -57,6 +57,7 @@ export const ROUTES = {
   'item?id=9100': 'synthetic/item-loggedin.html',
   'user?id=margintest': 'synthetic/user-own.html',
   'news?synthetic=1': 'synthetic/news-loggedin.html',
+  'item?id=9200': 'synthetic/item-deep.html',
 };
 
 const fixture = (name) => readFileSync(join(ROOT, 'fixtures', name));

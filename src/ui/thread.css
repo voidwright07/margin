@@ -1,4 +1,4 @@
-/* Comment threads: rail colours. */
+/* Comment threads: rail colours and quote blocks. */
 
 /* Six rail hues per theme, at full strength. Rails mix them into the page background by --rail-mix, and a
    hovered branch shows the full hue. Adjacent depths sit far apart on the colour wheel. */
@@ -83,3 +83,22 @@ html[data-mg-lines='accent'] .mg-rail:nth-child(2) { --rail-fade: 56%; }
 html[data-mg-lines='accent'] .mg-rail:nth-child(3) { --rail-fade: 44%; }
 html[data-mg-lines='accent'] .mg-rail:nth-child(4) { --rail-fade: 35%; }
 html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
+
+.mg-commtext .mg-quote {
+  margin: 0.65em 0 0;
+  padding: 1px 0 1px 12px;
+  border-left: 3px solid var(--rule-strong);
+  color: var(--muted);
+}
+.mg-commtext > .mg-quote:first-child {
+  margin-top: 0;
+}
+/* Consecutive quoted paragraphs read as one block: the bar runs through. */
+.mg-commtext .mg-quote + .mg-quote {
+  margin-top: 0;
+  padding-top: 0.45em;
+}
+.mg-quote-mark {
+  display: none;
+}
+

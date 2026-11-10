@@ -254,6 +254,16 @@ const CASES: Case[] = [
     },
   },
   {
+    file: 'synthetic/item-deep.html', path: 'item?id=9200', kind: 'item',
+    check: (page) => {
+      const p = as(page, 'item');
+      expect(p.meta.viewer).toBeNull();
+      expect(Math.max(...p.comments.map((c) => c.depth))).toBe(9);
+      expect(p.comments.find((c) => c.id === 9210)).toMatchObject({ depth: 9, parentId: 9209, by: 'dara' });
+      expect(p.comments.find((c) => c.id === 9203)!.html).toContain('<pre><code>');
+    },
+  },
+  {
     file: 'synthetic/user-own.html', path: 'user?id=margintest', kind: 'user',
     check: (page) => {
       expect(as(page, 'user').user).toEqual({ id: 'margintest', created: 1600000000, createdText: 'September 13, 2020', karma: 1234, about: 'I build quiet tools.', editable: true });

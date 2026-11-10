@@ -67,11 +67,15 @@ SCENES.push(
       await p.mouse.up();
     },
   },
-  // The three rail styles on the same thread.
+  // Thread readability. item?id=9200 is the synthetic deep fixture (fixtures/synthetic/item-deep.html).
   ...['rainbow', 'accent', 'mono'].flatMap((threadLines) =>
     ['light', 'dark'].map((scheme) => ({ name: `rails-${threadLines}-${scheme}`, path: 'item?id=50442736', scheme, settings: { threadLines }, scrollTo: '[id="50444082"]' })),
   ),
   { name: 'rails-hover-light', path: 'item?id=50442736', scrollTo: '[id="50444082"]', run: async (p) => (await p.hover('[id="50444179"] .mg-rail:nth-child(2)'), sleep(200)) },
+  { name: 'synthetic-quotes-light', path: 'item?id=9200', scrollTo: '[id="9213"]' },
+  { name: 'synthetic-quotes-dark', path: 'item?id=9200', scheme: 'dark', scrollTo: '[id="9213"]' },
+  { name: 'synthetic-pre-light', path: 'item?id=9200', scrollTo: '[id="9202"]' },
+  { name: 'synthetic-pre-dark', path: 'item?id=9200', scheme: 'dark', scrollTo: '[id="9202"]' },
   { name: 'new-replies-light', path: 'item?id=50442736', scrollTo: '.mg-thread-bar', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] } }, seenAllBut: 6 },
   { name: 'news-badges-light', path: 'news', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] }, '50441707': { title: 'x', url: '', lastVisit: 1, commentCount: 140, seen: [] } } },
 );

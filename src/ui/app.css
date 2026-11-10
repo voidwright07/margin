@@ -923,10 +923,19 @@ html.mg-on body > center {
 .mg-commtext pre {
   margin: 0.65em 0 0;
   padding: 10px 12px;
+  border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--code-bg);
   overflow-x: auto;
   text-align: left;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  font: 0.88em/1.5 var(--mg-font-mono);
+}
+.mg-commtext pre code {
+  font: inherit;
 }
 .mg-commtext code {
   font: 0.88em/1.5 var(--mg-font-mono);
