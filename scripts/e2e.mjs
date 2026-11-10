@@ -353,7 +353,13 @@ await check('collapsed comments stay collapsed after a reload', async () => {
 await check('the threadLines setting changes the rail colour', async () => {
   await resetStorage();
   await open('item?id=50442736');
-  const rail = () => page.$eval('[id="50444082"] .mg-rail', (el) => getComputedStyle(el, '::before').backgroundColor);
+  // The rail's background has a short transition; read it once it has finished, not mid-way.
+  const rail = () =>
+    page.$eval('[id="50444082"] .mg-rail', async (el) => {
+      getComputedStyle(el, '::before').backgroundColor;
+      await Promise.all(document.getAnimations().map((a) => a.finished));
+      return getComputedStyle(el, '::before').backgroundColor;
+    });
   const rainbow = await rail();
   const colours = { rainbow };
   for (const threadLines of ['accent', 'mono']) {
