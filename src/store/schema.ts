@@ -7,11 +7,13 @@ export const THEMES = ['system', 'light', 'classic', 'slate', 'dark', 'black'] a
 export const FONTS = ['sans', 'serif', 'mono'] as const;
 export const INDEX_VIEWS = ['list', 'table', 'compact'] as const;
 export const TABLE_COLUMNS = ['rank', 'vote', 'title', 'site', 'score', 'by', 'age', 'comments'] as const;
+export const THREAD_LINES = ['rainbow', 'accent', 'mono'] as const;
 
 export type Theme = (typeof THEMES)[number];
 export type Font = (typeof FONTS)[number];
 export type IndexView = (typeof INDEX_VIEWS)[number];
 export type TableColumn = (typeof TABLE_COLUMNS)[number];
+export type ThreadLines = (typeof THREAD_LINES)[number];
 
 export type Settings = {
   enabled: boolean;
@@ -25,6 +27,8 @@ export type Settings = {
   tableColumns: TableColumn[];
   openLinksInNewTab: boolean;
   keyboard: boolean;
+  /** Thread rail colours: a hue per depth, one accent hue fading with depth, or plain gray. */
+  threadLines: ThreadLines;
 };
 
 export type HistoryEntry = {
@@ -73,6 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tableColumns: ['rank', 'vote', 'title', 'score', 'by', 'age', 'comments'],
   openLinksInNewTab: false,
   keyboard: true,
+  threadLines: 'rainbow',
 };
 
 export const HISTORY_CAP = 2000;
@@ -117,6 +122,7 @@ export const parseSettings = (raw: unknown): Settings => {
     tableColumns: cols && cols.includes('title') ? cols : [...d.tableColumns],
     openLinksInNewTab: bool(r.openLinksInNewTab, d.openLinksInNewTab),
     keyboard: bool(r.keyboard, d.keyboard),
+    threadLines: oneOf(THREAD_LINES, r.threadLines, d.threadLines),
   };
 };
 
@@ -131,7 +137,7 @@ const parseHistoryEntry = (v: unknown): HistoryEntry | null => {
   };
 };
 
-export const capHistory = (h: Record<string, HistoryEntry>): Record<string, HistoryEntry> => {
+export const capHistory =(h: Record<string, HistoryEntry>): Record<string, HistoryEntry> => {
   const entries = Object.entries(h);
   if (entries.length <= HISTORY_CAP) return h;
   entries.sort((a, b) => b[1].lastVisit - a[1].lastVisit);

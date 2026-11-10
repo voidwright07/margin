@@ -240,6 +240,20 @@ await check('the theme stored in settings themes the page', async () => {
   assert.equal(await page.evaluate(() => document.documentElement.dataset.mgTheme), 'slate');
 });
 
+await check('the threadLines setting changes the rail colour', async () => {
+  await resetStorage();
+  await open('item?id=50442736');
+  const rail = () => page.$eval('[id="50444082"] .mg-rail', (el) => getComputedStyle(el, '::before').backgroundColor);
+  const rainbow = await rail();
+  const colours = { rainbow };
+  for (const threadLines of ['accent', 'mono']) {
+    await resetStorage({ threadLines });
+    await page.waitForFunction((v) => document.documentElement.dataset.mgLines === v, { timeout: 2000 }, threadLines);
+    colours[threadLines] = await rail();
+  }
+  assert.equal(new Set(Object.values(colours)).size, 3, JSON.stringify(colours));
+});
+
 for (const [status, line] of results) console.log(`${status.padEnd(4)} ${line}`);
 const relevant = warnings.filter((w) => !w.includes('Failed to load resource'));
 if (relevant.length) console.log('page warnings:', relevant);

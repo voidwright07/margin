@@ -1,4 +1,4 @@
-import { FONTS, INDEX_VIEWS, RANGES, TABLE_COLUMNS, THEMES, type Settings, type TableColumn, type Theme } from '../store/schema';
+import { FONTS, INDEX_VIEWS, RANGES, TABLE_COLUMNS, THEMES, THREAD_LINES, type Settings, type TableColumn, type Theme } from '../store/schema';
 import { updateSettings, useStore } from '../store/store';
 
 const THEME_LABEL: Record<Theme, string> = {
@@ -105,6 +105,10 @@ export function SettingsPanel({ showOriginalToggle = true }: { showOriginalToggl
         <Slider label="Line height" value={s.lineHeight} range={RANGES.lineHeight} unit="" onInput={(lineHeight) => set({ lineHeight })} />
         <Slider label="Column width" value={s.columnWidth} range={RANGES.columnWidth} unit="px" onInput={(columnWidth) => set({ columnWidth })} />
         <Toggle label="Justify comment text" checked={s.justify} onChange={(justify) => set({ justify })} />
+      </section>
+      <section>
+        <h3>Thread lines</h3>
+        <Segmented label="Thread lines" value={s.threadLines} options={THREAD_LINES} onChange={(threadLines) => set({ threadLines })} />
       </section>
       <section>
         <h3>Story lists</h3>

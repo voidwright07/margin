@@ -67,6 +67,11 @@ SCENES.push(
       await p.mouse.up();
     },
   },
+  // The three rail styles on the same thread.
+  ...['rainbow', 'accent', 'mono'].flatMap((threadLines) =>
+    ['light', 'dark'].map((scheme) => ({ name: `rails-${threadLines}-${scheme}`, path: 'item?id=50442736', scheme, settings: { threadLines }, scrollTo: '[id="50444082"]' })),
+  ),
+  { name: 'rails-hover-light', path: 'item?id=50442736', scrollTo: '[id="50444082"]', run: async (p) => (await p.hover('[id="50444179"] .mg-rail:nth-child(2)'), sleep(200)) },
   { name: 'new-replies-light', path: 'item?id=50442736', scrollTo: '.mg-thread-bar', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] } }, seenAllBut: 6 },
   { name: 'news-badges-light', path: 'news', history: { '50442736': { title: '.name Grandfathered', url: '', lastVisit: 1, commentCount: 70, seen: [] }, '50441707': { title: 'x', url: '', lastVisit: 1, commentCount: 140, seen: [] } } },
 );

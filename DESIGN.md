@@ -81,7 +81,7 @@ The captured HTML corrected three details of the first draft:
 
 `src/store/` holds a single versioned schema in `chrome.storage.local`, with `{ version, settings, history, bookmarks, highlights }`. Backup exports exactly this JSON. Restore validates it at the boundary and migrates by version.
 
-- `settings`: theme (`system|light|classic|slate|dark|black`), font (`sans|serif|mono`), fontSize, columnWidth, lineHeight, justify, indexView (`list|table|compact`), tableColumns, openLinksInNewTab, enabled (old-design toggle), keyboard on/off.
+- `settings`: theme (`system|light|classic|slate|dark|black`), font (`sans|serif|mono`), fontSize, columnWidth, lineHeight, justify, indexView (`list|table|compact`), tableColumns, openLinksInNewTab, enabled (old-design toggle), keyboard on/off, threadLines (`rainbow|accent|mono`, the rail colours).
 - `history`: `Record<storyId, { title, url, lastVisit, commentCount, seen: number[] }>` capped by LRU at 2000 stories. `seen` stores the comment ids already rendered on a visit. "New replies" means the ids on the current visit minus `seen`.
 - `bookmarks`: a tagged union `{ type: 'story' | 'comment' | 'user'; id; savedAt; snapshot }`.
 - `highlights`: `{ id, itemId, commentId | null, text, createdAt }`, re-applied by text match inside the target node.
@@ -104,6 +104,12 @@ These details were settled while building and differ from, or add to, the plan a
 - Logged-out readers see HN's reply form markup, but HN rejects their posts. Margin shows "Log in to comment" instead of a composer when `meta.viewer` is null, and comment replies stay plain links to HN.
 - Keyboard focus is a `data-mg-focused` attribute, not a class, because Preact rewrites `className` when a row re-renders.
 - The section tabs include Comments (`newcomments`) in addition to the sections HN lists in its header.
+
+### Comment threads
+
+Thread styles live in `src/ui/thread.css`.
+
+- Rails are coloured by depth. `thread.css` defines six hues per theme and mixes each into the page background, so a rail is easy to follow but stays quiet. `settings.threadLines` sets `html[data-mg-lines]`: `rainbow` cycles the six hues, `accent` uses the accent hue and fades it with depth, and `mono` is gray. Hovering a rail draws its whole branch in the full hue.
 
 ## Feature checklist (ModernHN free + Pro)
 

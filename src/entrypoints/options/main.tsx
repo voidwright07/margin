@@ -1,5 +1,6 @@
 import '../../ui/tokens.css';
 import '../../ui/app.css';
+import '../../ui/thread.css';
 import '../../ui/pages.css';
 import { render } from 'preact';
 import { loadState, subscribe, updateSettings, useStore } from '../../store/store';

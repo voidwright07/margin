@@ -39,7 +39,6 @@ html[data-mg-theme='system'] {
   --mark-ink: #2b2100;
   --focus: rgba(255, 102, 0, 0.35);
   --shadow: 0 8px 28px rgba(18, 20, 24, 0.12), 0 1px 3px rgba(18, 20, 24, 0.08);
-  --thread: #e4e5e9;
   --code-bg: #f3f4f6;
 }
 
@@ -64,7 +63,6 @@ html[data-mg-theme='classic'] {
   --mark-ink: #2b2100;
   --focus: rgba(255, 102, 0, 0.35);
   --shadow: 0 8px 28px rgba(40, 36, 20, 0.14), 0 1px 3px rgba(40, 36, 20, 0.08);
-  --thread: #deded1;
   --code-bg: #ececdf;
 }
 
@@ -89,7 +87,6 @@ html[data-mg-theme='slate'] {
   --mark-ink: #fff6dc;
   --focus: rgba(255, 138, 61, 0.45);
   --shadow: 0 10px 32px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --thread: #343d50;
   --code-bg: #20283a;
 }
 
@@ -114,7 +111,6 @@ html[data-mg-theme='dark'] {
   --mark-ink: #fff4d6;
   --focus: rgba(255, 122, 38, 0.45);
   --shadow: 0 10px 32px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --thread: #2c2f36;
   --code-bg: #1b1d22;
 }
 
@@ -139,7 +135,6 @@ html[data-mg-theme='black'] {
   --mark-ink: #fff4d6;
   --focus: rgba(255, 122, 26, 0.45);
   --shadow: 0 10px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px #1c1c1f;
-  --thread: #222226;
   --code-bg: #0e0e10;
 }
 
@@ -164,7 +159,6 @@ html[data-mg-theme='black'] {
     --mark-ink: #fff4d6;
     --focus: rgba(255, 122, 38, 0.45);
     --shadow: 0 10px 32px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
-    --thread: #2c2f36;
     --code-bg: #1b1d22;
   }
 }

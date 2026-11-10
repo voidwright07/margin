@@ -119,3 +119,13 @@ describe('store module owns chrome.storage.local', () => {
     expect(parseState(raw)).toEqual(next);
   });
 });
+
+describe('thread settings', () => {
+  it('validates threadLines, defaulting to rainbow', () => {
+    expect(defaultState().settings.threadLines).toBe('rainbow');
+    expect(parseState({ settings: { threadLines: 'accent' } }).settings.threadLines).toBe('accent');
+    expect(parseState({ settings: { threadLines: 'mono' } }).settings.threadLines).toBe('mono');
+    expect(parseState({ settings: { threadLines: 'neon' } }).settings.threadLines).toBe('rainbow');
+    expect(parseState({ settings: { threadLines: 3 } }).settings.threadLines).toBe('rainbow');
+  });
+});

@@ -753,15 +753,15 @@ html.mg-on body > center {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 12px;
-  width: 1px;
-  background: var(--thread);
+  left: 11px;
+  width: 2px;
+  background: var(--rail);
   transition: background 0.12s ease, width 0.12s ease;
 }
 .mg-rail.is-hot::before {
-  width: 2px;
-  left: 11.5px;
-  background: var(--accent);
+  width: 3px;
+  left: 10px;
+  background: var(--rail-hot);
 }
 .mg-c-main {
   flex: 1;
@@ -1464,7 +1464,7 @@ html.mg-raw .rank {
     left: 5px;
   }
   .mg-rail.is-hot::before {
-    left: 4.5px;
+    left: 4px;
   }
   .mg-item-meta,
   .mg-toptext {

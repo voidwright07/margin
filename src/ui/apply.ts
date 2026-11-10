@@ -4,6 +4,7 @@ import type { Settings, Theme } from '../store/schema';
 export const applySettings = (html: HTMLElement, s: Settings): void => {
   html.dataset.mgTheme = s.theme;
   html.dataset.mgFont = s.font;
+  html.dataset.mgLines = s.threadLines;
   html.style.setProperty('--mg-fs', `${s.fontSize}px`);
   html.style.setProperty('--mg-lh', String(s.lineHeight));
   html.style.setProperty('--mg-measure', `${s.columnWidth}px`);

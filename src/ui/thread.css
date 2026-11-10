@@ -1,0 +1,85 @@
+/* Comment threads: rail colours. */
+
+/* Six rail hues per theme, at full strength. Rails mix them into the page background by --rail-mix, and a
+   hovered branch shows the full hue. Adjacent depths sit far apart on the colour wheel. */
+html[data-mg-theme='light'],
+html[data-mg-theme='system'] {
+  --hue-1: #3b7fc4;
+  --hue-2: #c98a12;
+  --hue-3: #23998b;
+  --hue-4: #c4507a;
+  --hue-5: #5b982b;
+  --hue-6: #7d5cc7;
+  --rail-mix: 55%;
+}
+html[data-mg-theme='classic'] {
+  --hue-1: #3f6fae;
+  --hue-2: #b07d10;
+  --hue-3: #2b8a7e;
+  --hue-4: #b04f6f;
+  --hue-5: #58872c;
+  --hue-6: #7356b0;
+  --rail-mix: 55%;
+}
+html[data-mg-theme='slate'] {
+  --hue-1: #79a6f2;
+  --hue-2: #e3b45b;
+  --hue-3: #5fc5b6;
+  --hue-4: #ec8fae;
+  --hue-5: #a3cf72;
+  --hue-6: #b79df2;
+  --rail-mix: 55%;
+}
+html[data-mg-theme='dark'] {
+  --hue-1: #77a3ee;
+  --hue-2: #deae5a;
+  --hue-3: #5cbfb1;
+  --hue-4: #e88aa9;
+  --hue-5: #9cc76b;
+  --hue-6: #b499ee;
+  --rail-mix: 48%;
+}
+html[data-mg-theme='black'] {
+  --hue-1: #6b94dc;
+  --hue-2: #c99d52;
+  --hue-3: #52ab9f;
+  --hue-4: #d27e9a;
+  --hue-5: #8db662;
+  --hue-6: #a28bdc;
+  --rail-mix: 45%;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-mg-theme='system'] {
+    --hue-1: #77a3ee;
+    --hue-2: #deae5a;
+    --hue-3: #5cbfb1;
+    --hue-4: #e88aa9;
+    --hue-5: #9cc76b;
+    --hue-6: #b499ee;
+    --rail-mix: 48%;
+  }
+}
+
+/* A rail's position in its row is its ancestor's depth. Mono is the fallback before settings apply. */
+.mg-rail {
+  --rail: color-mix(in srgb, var(--faint) 50%, var(--bg));
+  --rail-hot: var(--accent);
+}
+html[data-mg-lines='rainbow'] .mg-rail {
+  --rail: color-mix(in srgb, var(--rail-hue) var(--rail-mix), var(--bg));
+  --rail-hot: var(--rail-hue);
+}
+html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 1) { --rail-hue: var(--hue-1); }
+html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 2) { --rail-hue: var(--hue-2); }
+html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 3) { --rail-hue: var(--hue-3); }
+html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 4) { --rail-hue: var(--hue-4); }
+html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 5) { --rail-hue: var(--hue-5); }
+html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 6) { --rail-hue: var(--hue-6); }
+html[data-mg-lines='accent'] .mg-rail {
+  --rail: color-mix(in srgb, var(--accent) var(--rail-fade, 22%), var(--bg));
+}
+html[data-mg-lines='accent'] .mg-rail:nth-child(1) { --rail-fade: 72%; }
+html[data-mg-lines='accent'] .mg-rail:nth-child(2) { --rail-fade: 56%; }
+html[data-mg-lines='accent'] .mg-rail:nth-child(3) { --rail-fade: 44%; }
+html[data-mg-lines='accent'] .mg-rail:nth-child(4) { --rail-fade: 35%; }
+html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
