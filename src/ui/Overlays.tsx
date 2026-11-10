@@ -29,7 +29,7 @@ export function KeyboardLayer() {
   return null;
 }
 
-const keyLabel = (k: string) => (k === 'Escape' ? 'Esc' : k);
+const keyLabel = (k: string) => (k === 'Escape' ? 'Esc' : /^[A-Z]$/.test(k) ? `Shift+${k}` : k);
 
 export function HelpOverlay() {
   const [panel, setPanel] = usePanel();

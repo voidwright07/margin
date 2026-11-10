@@ -1,4 +1,5 @@
 import { getPanel, setPanel } from './panels';
+import { navTarget, type ThreadMove } from './threadNav';
 
 /**
  * Keyboard navigation works on the rendered DOM: rows carry data-mg-nav, and each command clicks a marked
@@ -52,6 +53,26 @@ export const jumpNew = (delta: 1 | -1) => {
   focusRow(next);
 };
 
+export const focusComment = (id: number) =>
+  focusRow(document.querySelector<HTMLElement>(`#margin-root .mg-thread ${NAV}[data-id="${id}"]`));
+
+/** Move between comments by thread structure. Rows carry data-depth, so the flat-array helpers apply directly. */
+export const threadJump = (move: ThreadMove) => {
+  const rows = Array.from(document.querySelectorAll<HTMLElement>(`#margin-root .mg-thread ${NAV}[data-depth]`));
+  if (rows.length === 0) return;
+  const depths = rows.map((el) => ({ depth: Number(el.dataset.depth) }));
+  const cur = current();
+  let at = cur ? rows.indexOf(cur) : -1;
+  if (at === -1) {
+    if (move !== 'nextTop' && move !== 'prevTop') return;
+    // Nothing focused: start from the thread on screen, as j does.
+    at = Math.max(0, rows.findIndex((el) => el.getBoundingClientRect().bottom > 80));
+    if (move === 'nextTop' && depths[at]!.depth === 0) return focusRow(rows[at]!);
+  }
+  const target = navTarget(depths, at, move);
+  if (target !== null) focusRow(rows[target]!);
+};
+
 const clickIn = (selector: string) => {
   const scope = current();
   const el = scope?.querySelector<HTMLElement>(selector) ?? (scope ? null : document.querySelector<HTMLElement>(`#margin-root ${selector}`));
@@ -76,12 +97,16 @@ export const COMMANDS: Command[] = [
   { keys: ['k'], label: 'Previous story or comment', run: () => move(-1) },
   { keys: ['n'], label: 'Next new comment', run: () => jumpNew(1) },
   { keys: ['p'], label: 'Previous new comment', run: () => jumpNew(-1) },
+  { keys: ['J'], label: 'Next top-level comment', run: () => threadJump('nextTop') },
+  { keys: ['K'], label: 'Previous top-level comment', run: () => threadJump('prevTop') },
+  { keys: ['h'], label: 'Parent comment', run: () => threadJump('parent') },
+  { keys: ['r'], label: 'Root of this thread', run: () => threadJump('root') },
   { keys: ['o', 'Enter'], label: 'Open the link', run: () => clickIn('[data-mg-open]') },
   { keys: ['c'], label: 'Open the comments', run: () => clickIn('[data-mg-comments]') },
   { keys: ['u'], label: 'Upvote or remove vote', run: () => clickIn('[data-mg-vote]') },
   { keys: ['b'], label: 'Bookmark', run: () => clickIn('[data-mg-bookmark]') },
   { keys: ['x'], label: 'Collapse or expand thread', run: () => clickIn('[data-mg-collapse]') },
-  { keys: ['r'], label: 'Reply to the comment', run: () => clickIn('[data-mg-reply]') },
+  { keys: ['R'], label: 'Reply to the comment', run: () => clickIn('[data-mg-reply]') },
   { keys: [']'], label: 'Next page', run: () => void clickPage('[data-mg-next]', '[data-mg-nextday]') },
   { keys: ['['], label: 'Previous page', run: () => void (clickPage('[data-mg-prev]') || history.back()) },
   { keys: ['g'], label: 'Back to top', run: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },

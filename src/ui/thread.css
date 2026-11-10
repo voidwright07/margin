@@ -1,4 +1,4 @@
-/* Comment threads: rail colours and quote blocks. */
+/* Comment threads: rail colours, quotes, the indent cap and thread navigation. */
 
 /* Six rail hues per theme, at full strength. Rails mix them into the page background by --rail-mix, and a
    hovered branch shows the full hue. Adjacent depths sit far apart on the colour wheel. */
@@ -102,3 +102,71 @@ html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
   display: none;
 }
 
+.mg-c-navs {
+  display: inline-flex;
+  gap: 8px;
+  font-size: 12px;
+}
+.mg-c-navs a {
+  color: var(--faint) !important;
+}
+.mg-c-navs a:hover {
+  color: var(--accent-ink) !important;
+}
+
+/* Past the rail cap a comment names its parent instead of indenting further. */
+.mg-c-replyto {
+  display: none;
+  position: relative;
+  margin-bottom: 2px;
+}
+.mg-c-replyto.is-deep {
+  display: block;
+}
+.mg-replyto-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font: 12px var(--mg-font);
+  cursor: pointer;
+}
+.mg-replyto-btn b {
+  font-weight: 600;
+  color: var(--muted);
+}
+.mg-replyto-btn:hover,
+.mg-replyto-btn:hover b,
+.mg-replyto-btn:focus-visible b {
+  color: var(--accent-ink);
+}
+.mg-parentpop {
+  top: calc(100% + 4px);
+  left: 0;
+  width: min(460px, 80vw);
+  padding: 10px 12px 12px;
+}
+.mg-parentpop-head {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.mg-parentpop-head b {
+  color: var(--ink);
+}
+.mg-parentpop-text {
+  max-height: 9.5em;
+  overflow: hidden;
+  font-size: 13.5px;
+  line-height: 1.5;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+@media (max-width: 760px) {
+  /* Keep in step with RAIL_CAP.narrow in Thread.tsx. */
+  .mg-rail:nth-child(n + 4) {
+    display: none;
+  }
+  .mg-c-replyto {
+    display: block;
+  }
+}

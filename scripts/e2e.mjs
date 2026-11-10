@@ -241,6 +241,66 @@ await check('the theme stored in settings themes the page', async () => {
   assert.equal(await page.evaluate(() => document.documentElement.dataset.mgTheme), 'slate');
 });
 
+const focusedId = () => page.$eval('[data-mg-focused]', (el) => Number(el.dataset.id)).catch(() => null);
+const shift = async (code) => {
+  await page.keyboard.down('Shift');
+  await page.keyboard.press(code);
+  await page.keyboard.up('Shift');
+};
+
+await check('Shift+J, Shift+K, h and r move focus by thread structure', async () => {
+  await resetStorage();
+  await open('item?id=9200');
+  await page.keyboard.type('j');
+  assert.equal(await focusedId(), 9201);
+  await shift('KeyJ');
+  assert.equal(await focusedId(), 9213, 'Shift+J: next top-level');
+  await shift('KeyJ');
+  assert.equal(await focusedId(), 9216);
+  await shift('KeyK');
+  assert.equal(await focusedId(), 9213, 'Shift+K: previous top-level');
+  await shift('KeyK');
+  await page.keyboard.type('jjjjjjjjj');
+  assert.equal(await focusedId(), 9210, 'depth 9');
+  await page.keyboard.type('h');
+  assert.equal(await focusedId(), 9209, 'h: parent');
+  await page.keyboard.type('h');
+  assert.equal(await focusedId(), 9208);
+  await page.keyboard.type('r');
+  assert.equal(await focusedId(), 9201, 'r: root');
+  await page.keyboard.type('jjjjjjjjjj');
+  assert.equal(await focusedId(), 9211);
+  await shift('KeyK');
+  assert.equal(await focusedId(), 9201, 'Shift+K from a reply returns to its top-level comment');
+  await page.keyboard.type('?');
+  const keys = await page.$$eval('.mg-keys dt', (d) => d.map((x) => x.textContent));
+  for (const k of ['Shift+J', 'Shift+K', 'h', 'r', 'Shift+R']) assert.ok(keys.includes(k), `help lists ${k}`);
+});
+
+await check('past depth 6 a comment says who it replies to, and the preview shows that parent', async () => {
+  await resetStorage();
+  await open('item?id=9200');
+  const rails = await page.$$eval('[id="9210"] .mg-rail', (r) => r.length);
+  assert.equal(rails, 6, 'rails stop at the cap');
+  const visible = (id) => page.$eval(`[id="${id}"] .mg-c-replyto`, (el) => el.checkVisibility()).catch(() => false);
+  assert.equal(await visible(9207), false, 'depth 6 has no label');
+  assert.equal(await visible(9205), false, 'depth 4 label is mobile only');
+  assert.equal(await visible(9208), true, 'depth 7 has a label');
+  assert.equal(await page.$eval('[id="9208"] .mg-replyto-btn b', (b) => b.textContent), 'dara');
+  await page.hover('[id="9209"] .mg-replyto-btn');
+  await page.waitForSelector('[id="9209"] .mg-parentpop', { timeout: 2000 });
+  assert.equal(await page.$eval('[id="9209"] .mg-parentpop-head b', (b) => b.textContent), 'ada');
+  await page.mouse.move(5, 5);
+  await page.waitForFunction(() => !document.querySelector('[id="9209"] .mg-parentpop'), { timeout: 2000 });
+  await page.focus('[id="9210"] .mg-replyto-btn');
+  await page.waitForSelector('[id="9210"] .mg-parentpop', { timeout: 2000 });
+  assert.equal(await page.$eval('[id="9210"] .mg-parentpop-head b', (b) => b.textContent), 'cole', 'keyboard focus opens the preview too');
+  await page.setViewport({ width: 390, height: 844 });
+  assert.equal(await visible(9205), true, 'mobile shows the label from depth 4');
+  assert.equal(await page.$$eval('[id="9205"] .mg-rail', (r) => r.filter((x) => x.checkVisibility()).length), 3, 'mobile caps rails at 3');
+  await page.setViewport({ width: 1280, height: 1000 });
+});
+
 await check('the threadLines setting changes the rail colour', async () => {
   await resetStorage();
   await open('item?id=50442736');

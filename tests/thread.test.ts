@@ -8,6 +8,7 @@ import { frontDay } from '../src/ui/FrontDayNav';
 import { applyHighlights } from '../src/ui/highlight';
 import { markQuotes } from '../src/ui/commentText';
 import { subtreeSizes, visibleRows } from '../src/ui/Thread';
+import { navTarget } from '../src/ui/threadNav';
 
 const itemDoc = () => parseHTML(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'item.html'), 'utf8')).document as unknown as Document;
 
@@ -65,6 +66,56 @@ describe('highlights re-apply by text match', () => {
     const marks = [...el.querySelectorAll('mark')].map((m) => m.textContent);
     expect(marks).toEqual(['lo ', 'brave']);
     expect(el.textContent).toBe('Hello brave new world');
+  });
+});
+
+describe('thread navigation agrees with the links HN prints on each comment', () => {
+  const doc = itemDoc();
+  const comments = itemComments();
+  const hnLink = (id: number, label: string): number | null => {
+    const a = Array.from(doc.querySelectorAll(`tr.comtr[id="${id}"] .navs a`)).find((x) => x.textContent === label);
+    return a ? Number(a.getAttribute('href')!.slice(1)) : null;
+  };
+  const idAt = (i: number | null) => (i === null ? null : comments[i]!.id);
+
+  it('parent and root', () => {
+    comments.forEach((c, i) => {
+      expect(idAt(navTarget(comments, i, 'parent')), `parent of ${c.id}`).toBe(hnLink(c.id, 'parent'));
+      // HN prints "root" only from depth 2; at depth 1 the root is the parent.
+      expect(idAt(navTarget(comments, i, 'root')), `root of ${c.id}`).toBe(hnLink(c.id, 'root') ?? hnLink(c.id, 'parent'));
+    });
+  });
+
+  it('next and previous top-level comment', () => {
+    const tops = comments.flatMap((c, i) => (c.depth === 0 ? [i] : []));
+    expect(tops.length).toBeGreaterThan(5);
+    for (const i of tops) {
+      const id = comments[i]!.id;
+      expect(idAt(navTarget(comments, i, 'nextTop')), `next of ${id}`).toBe(hnLink(id, 'next'));
+      expect(idAt(navTarget(comments, i, 'prevTop')), `prev of ${id}`).toBe(hnLink(id, 'prev'));
+    }
+  });
+
+  it('from a reply, top-level moves leave the thread forward and return to its root backward', () => {
+    const i = comments.findIndex((c) => c.depth === 3);
+    const root = navTarget(comments, i, 'root')!;
+    expect(navTarget(comments, i, 'prevTop')).toBe(root);
+    expect(idAt(navTarget(comments, i, 'nextTop'))).toBe(hnLink(comments[root]!.id, 'next'));
+  });
+
+  it('gives the same answers on the visible rows after a collapse', () => {
+    const sizes = subtreeSizes(comments);
+    const rows = visibleRows(comments, sizes, new Set([comments.find((c) => c.depth === 1)!.id]));
+    rows.forEach((row, i) => {
+      const parent = navTarget(rows.map((r) => r.comment), i, 'parent');
+      expect(parent === null ? null : rows[parent]!.comment.id).toBe(hnLink(row.comment.id, 'parent'));
+    });
+  });
+
+  it('returns null when the ancestor is not on the page', () => {
+    expect(navTarget([{ depth: 2 }, { depth: 0 }, { depth: 3 }], 2, 'parent')).toBeNull();
+    expect(navTarget([{ depth: 0 }], 0, 'parent')).toBeNull();
+    expect(navTarget([{ depth: 0 }], 0, 'nextTop')).toBeNull();
   });
 });
 

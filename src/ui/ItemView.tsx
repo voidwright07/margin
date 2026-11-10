@@ -158,7 +158,7 @@ export function ItemView({ page: initial }: { page: ItemPage }) {
     root.type === 'comment' ? (
       <div class="mg-root-comment">
         <CommentView
-          row={{ comment: root, ancestors: [], size: 1, collapsed: false }}
+          row={{ comment: root, index: 0, ancestors: [], size: 1, collapsed: false }}
           itemId={root.story?.id ?? root.id}
           canQuote={canPost}
           op={null}
@@ -167,6 +167,8 @@ export function ItemView({ page: initial }: { page: ItemPage }) {
           onToggle={() => {}}
           onCollapseAncestor={() => {}}
           onReply={null}
+          parent={null}
+          root={null}
           highlights={rootHighlights}
           reply={null}
         />

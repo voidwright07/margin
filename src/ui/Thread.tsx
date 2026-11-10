@@ -8,9 +8,17 @@ import { markQuotes } from './commentText';
 import { Composer } from './Composer';
 import { applyHighlights } from './highlight';
 import { IconDown, IconUp } from './icons';
+import { focusComment } from './keyboard';
+import { navTarget } from './threadNav';
 import { useHnToggle } from './useToggle';
 
 type ItemPage = Extract<Page, { kind: 'item' }>;
+
+/**
+ * Deeper comments stop indenting at this many rails and show "replying to" instead. thread.css hides rails
+ * past the narrow cap on mobile widths, so the label renders from the narrow cap and CSS shows it there.
+ */
+export const RAIL_CAP = { wide: 6, narrow: 3 } as const;
 
 /** Size of each comment's subtree (itself included), from the flat depth-ordered array. */
 export const subtreeSizes = (comments: Comment[]): number[] => {
@@ -24,7 +32,7 @@ export const subtreeSizes = (comments: Comment[]): number[] => {
   return sizes;
 };
 
-type Row = { comment: Comment; ancestors: number[]; size: number; collapsed: boolean };
+type Row = { comment: Comment; index: number; ancestors: number[]; size: number; collapsed: boolean };
 
 /** Walk the flat array once, skipping everything under a collapsed comment until depth returns to its level. */
 export const visibleRows = (comments: Comment[], sizes: number[], collapsed: ReadonlySet<number>): Row[] => {
@@ -36,7 +44,7 @@ export const visibleRows = (comments: Comment[], sizes: number[], collapsed: Rea
     skipBelow = Infinity;
     ancestors.length = comment.depth;
     const isCollapsed = collapsed.has(comment.id);
-    rows.push({ comment, ancestors: [...ancestors], size: sizes[i]!, collapsed: isCollapsed });
+    rows.push({ comment, index: i, ancestors: [...ancestors], size: sizes[i]!, collapsed: isCollapsed });
     ancestors[comment.depth] = comment.id;
     if (isCollapsed) skipBelow = comment.depth;
   });
@@ -108,7 +116,61 @@ function FaveFlag({ comment }: { comment: Comment }) {
   );
 }
 
-export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAncestor, onReply, highlights, reply, itemId, canQuote }: {
+function ParentText({ html }: { html: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    ref.current!.innerHTML = html;
+    markQuotes(ref.current!);
+  }, [html]);
+  return <div ref={ref} class="mg-commtext mg-parentpop-text" />;
+}
+
+/** Past the indent cap, a comment names the one it answers; hover or focus previews it, click goes there. */
+function ReplyingTo({ parent, deep }: { parent: Comment; deep: boolean }) {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const show = (delay: number) => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setOpen(true), delay);
+  };
+  const hide = () => {
+    clearTimeout(timer.current);
+    setOpen(false);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const author = parent.deleted ? '[deleted]' : parent.by;
+  return (
+    <div class={`mg-c-replyto${deep ? ' is-deep' : ''}`} onMouseEnter={() => show(250)} onMouseLeave={hide}>
+      <button
+        type="button"
+        class="mg-replyto-btn"
+        aria-expanded={open}
+        title="Go to the parent comment"
+        onFocus={() => show(0)}
+        onBlur={hide}
+        onKeyDown={(e) => e.key === 'Escape' && hide()}
+        onClick={() => focusComment(parent.id)}
+      >
+        ↳ replying to <b>{author}</b>
+      </button>
+      {open && (
+        <div class="mg-popover mg-parentpop" role="tooltip">
+          <div class="mg-parentpop-head">
+            <b>{author}</b> {parent.ageText}
+          </div>
+          {!parent.deleted && <ParentText html={parent.html} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const jumpTo = (id: number) => (e: MouseEvent) => {
+  e.preventDefault();
+  focusComment(id);
+};
+
+export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAncestor, onReply, highlights, reply, itemId, canQuote, parent, root }: {
   row: Row;
   itemId: number;
   canQuote: boolean;
@@ -120,6 +182,9 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
   onReply: (() => void) | null;
   highlights: Highlight[];
   reply: preact.ComponentChildren;
+  /** Parent and root of this comment in the rendered thread, or null when they are not on the page. */
+  parent: Comment | null;
+  root: Comment | null;
 }) {
   const { comment: c, ancestors, size, collapsed } = row;
   const story = c.story;
@@ -129,11 +194,12 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
       class={`mg-c${collapsed ? ' is-collapsed' : ''}${isNew ? ' is-new' : ''}${c.dead ? ' is-dead' : ''}`}
       data-mg-nav
       data-id={c.id}
+      data-depth={c.depth}
       data-mg-new={isNew ? '' : undefined}
       aria-label={c.deleted ? 'Deleted comment' : `Comment by ${c.by}`}
     >
       <div class="mg-rails" aria-hidden="true">
-        {ancestors.map((id) => (
+        {ancestors.slice(0, RAIL_CAP.wide).map((id) => (
           <button
             type="button"
             tabIndex={-1}
@@ -147,6 +213,7 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
         ))}
       </div>
       <div class="mg-c-main">
+        {parent && !collapsed && c.depth > RAIL_CAP.narrow && <ReplyingTo parent={parent} deep={c.depth > RAIL_CAP.wide} />}
         <div class="mg-c-head">
           {!c.deleted && <CommentVotes comment={c} />}
           {c.deleted ? <span class="mg-c-deleted">[deleted]</span> : <UserLink name={c.by} op={op !== null && c.by === op} />}
@@ -159,6 +226,18 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
           <button type="button" class="mg-c-toggle" data-mg-collapse aria-expanded={!collapsed} title={collapsed ? 'Expand (x)' : 'Collapse (x)'} onClick={onToggle}>
             {collapsed ? `[+${size}]` : '[–]'}
           </button>
+          {!collapsed && parent && (
+            <span class="mg-c-navs">
+              {root && root !== parent && (
+                <a href={`#${root.id}`} title="Root of this thread (r)" onClick={jumpTo(root.id)}>
+                  root
+                </a>
+              )}
+              <a href={`#${parent.id}`} title="Parent comment (h)" onClick={jumpTo(parent.id)}>
+                parent
+              </a>
+            </span>
+          )}
           {!collapsed && !c.deleted && (
             <span class="mg-c-acts">
               {onReply && (
@@ -176,7 +255,7 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
                   context
                 </a>
               )}
-              {c.parentId !== null && !c.actions.context && story !== null && c.parentId !== story.id && (
+              {!parent && c.parentId !== null && !c.actions.context && story !== null && c.parentId !== story.id && (
                 <a class="mg-act" href={`item?id=${c.parentId}`}>
                   parent
                 </a>
@@ -221,6 +300,7 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
     return m;
   }, [allHighlights]);
   const rows = visibleRows(comments, sizes, collapsed);
+  const at = (i: number | null) => (i === null ? null : comments[i]!);
 
   const toggle = (id: number) => {
     const next = new Set(collapsed);
@@ -273,6 +353,8 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
             onCollapseAncestor={collapseAncestor}
             onReply={canInline ? () => setReply(reply?.id === c.id ? null : { id: c.id, draft: reply?.id === c.id ? reply.draft : '' }) : null}
             highlights={highlightsByComment.get(c.id) ?? NO_HIGHLIGHTS}
+            parent={at(navTarget(comments, row.index, 'parent'))}
+            root={at(navTarget(comments, row.index, 'root'))}
             reply={
               reply?.id === c.id && onPosted && c.actions.reply ? (
                 <Composer

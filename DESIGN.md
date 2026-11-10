@@ -107,16 +107,18 @@ These details were settled while building and differ from, or add to, the plan a
 
 ### Comment threads
 
-Thread styles live in `src/ui/thread.css`.
+Thread styles live in `src/ui/thread.css`; the structure helpers work on the flat comment array.
 
 - Rails are coloured by depth. `thread.css` defines six hues per theme and mixes each into the page background, so a rail is easy to follow but stays quiet. `settings.threadLines` sets `html[data-mg-lines]`: `rainbow` cycles the six hues, `accent` uses the accent hue and fades it with depth, and `mono` is gray. Hovering a rail draws its whole branch in the full hue.
 - Quotes are found in the rendered DOM, not in the HTML string. After a comment's HTML is inserted, `markQuotes` (`src/ui/commentText.ts`) walks its top-level nodes. A paragraph whose text starts with `>`, including HN's bare first paragraph, becomes a `p.mg-quote` block. The leading `>` stays in the DOM inside a hidden span, so highlights, copy and quoting still match the original text. `<pre>` is never touched; it scrolls sideways in the mono font.
+- Indentation stops at 6 rails (3 below 760px wide). A deeper comment shows "↳ replying to <author>". Hovering or focusing the label previews the parent in a popover, and clicking it moves focus there.
+- Parent, root and top-level moves come from `navTarget` in `src/ui/threadNav.ts`, a scan over any depth-ordered list. The thread renderer runs it on the comment array. The keyboard runs it on the rendered rows' `data-depth`, which works because collapsing hides only descendants. Comments at depth 1 and deeper get muted `parent` and `root` links in the header, as on HN.
 
 ## Feature checklist (ModernHN free + Pro)
 
 Free: themes, fonts, styles (width, line height, justify), history page/panel, inline reply and collapsible threads, list/table index with configurable columns, redesigned profile with tabs (about / submissions / comments / favorites), every account action, one-click old-design toggle.
 
-Pro (free here): bookmarks (stories, comments, users) and a bookmarks panel; highlighter; new-reply badges on story rows plus jumping between new comments; user hover card (reuses the user parser on a same-origin `user?id=` fetch, cached, 400 ms hover delay); selection popup (highlight, quote into reply, copy, speak via `speechSynthesis`, search HN via `hn.algolia.com`); control pad with keyboard shortcuts (`j/k` move, `n/p` next/prev new comment, `[`/`]` page, `o` open, `c` comments, `u` upvote, `b` bookmark, `x` collapse, `?` help); date picker for `front?day=`; backup and restore as JSON.
+Pro (free here): bookmarks (stories, comments, users) and a bookmarks panel; highlighter; new-reply badges on story rows plus jumping between new comments; user hover card (reuses the user parser on a same-origin `user?id=` fetch, cached, 400 ms hover delay); selection popup (highlight, quote into reply, copy, speak via `speechSynthesis`, search HN via `hn.algolia.com`); control pad with keyboard shortcuts (`j/k` move, `Shift+J`/`Shift+K` next/prev top-level comment, `h` parent, `r` thread root, `n/p` next/prev new comment, `R` reply, `[`/`]` page, `o` open, `c` comments, `u` upvote, `b` bookmark, `x` collapse, `?` help); date picker for `front?day=`; backup and restore as JSON.
 
 Beyond ModernHN: every list and comment page in its paginated forms, plus `item?id=…&p=N` comment pagination.
 
