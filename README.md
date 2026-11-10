@@ -2,16 +2,109 @@
 
 Margin is a free browser extension for Chrome, Edge and Firefox that redesigns every page of [Hacker News](https://news.ycombinator.com). It works on page two and beyond, on `?next=` pagination, on past front pages, on profiles and on the account pages, because it picks a layout from the shape of each page instead of its URL.
 
-What you get:
+Every feature is free. There is no account, no paid tier and no tracking.
+
+![Front page in the light theme](docs/screenshots/front-page-light.png)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Comment thread in the dark theme, with the selection menu open](docs/screenshots/comments-dark.png) | ![A deep thread with coloured lines, the indent cap and a parent preview](docs/screenshots/deep-thread-light.png) |
+| Comment threads with depth-coloured lines and the selection menu | Deep threads stop indenting and show who each reply answers |
+| ![Search results for "rust"](docs/screenshots/search-light.png) | ![Table view of the front page in the dark theme](docs/screenshots/table-view-dark.png) |
+| Search without leaving the redesign | Table view, with the columns you choose |
+| ![Settings panel](docs/screenshots/settings-light.png) | ![Past front page with the date picker, in the dark theme](docs/screenshots/past-day-dark.png) |
+| Themes, fonts, sizes and layout | Any past front page, with a date picker |
+
+## Features
+
+**Reading**
 
 - Six themes (system, light, classic, slate, dark, black), three font families, and settings for text size, line height, column width and justified text.
-- Story lists in list, table (choose the columns) or compact view.
-- Comment threads with depth-coloured lines, quote blocks and an indent cap for deep replies. Collapse a thread from its line or header, and it stays collapsed when you come back. Also inline replies, and badges for comments that are new since your last visit.
+- Story lists in list, table (choose the columns) or compact view, on every page: page 2 and beyond, `newest?next=…`, past front pages, Ask, Show, Jobs, Best, `from?site=`, submissions and favorites.
+- A date picker for the front page of any past day.
+- One click back to the original design, and one click to return.
+
+**Comment threads**
+
+- Depth-coloured thread lines (rainbow, accent or mono). Hover a line to light up its branch, and click it to collapse that branch.
+- Quote blocks for `>` quotes, and code blocks that scroll instead of wrapping.
+- Deep replies stop indenting after six levels and show "replying to …". Hover the label to preview the parent comment.
+- Collapse from the line, the `[–]` button or the comment header. A collapsed comment shows a one-line preview and stays collapsed when you come back.
+- Badges for comments that are new since your last visit, and keys to jump between them.
+- An OP marker on comments by the story's author, plus "parent" and "root" links.
+- Inline replies, without leaving the page.
+
+**Your library**
+
+- History of the stories you have read.
+- Bookmarks for stories, comments and people.
+- Highlights: select text in a story or comment and save it.
+- Backup and restore of everything as one JSON file.
+
+**Tools**
+
+- Search from the top bar (press `/`). Search stories, comments, Ask HN, Show HN or jobs, sorted by popularity or date, over any time range, with matches marked.
+- Profile cards when you hover a username, with karma, account age and about text.
+- A selection menu on selected text: highlight, quote into your reply, copy, read aloud, or search HN.
 - Every account action: vote, unvote, downvote, hide, favorite, flag, edit and delete.
-- A library of your history, bookmarks (stories, comments and people) and highlights, with backup and restore as one JSON file.
-- Search from the top bar (press `/`): stories, comments, Ask HN, Show HN and jobs, sorted by popularity or date, over any time range, with matches marked and results that stay in the redesign.
-- Profile cards when you hover a username, a selection menu (highlight, quote into your reply, copy, read aloud, search), and keyboard shortcuts. Press `?` on any page to see them.
-- One click back to the original design, and one click to return. HN has no search page of its own, so in the original design a search opens on hn.algolia.com.
+- Keyboard shortcuts and an on-screen control pad. Press `?` on any page to see every key.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Next / previous story or comment |
+| `Shift+J` / `Shift+K` | Next / previous top-level thread |
+| `h` / `r` | Parent / root comment |
+| `x` | Collapse or expand |
+| `n` / `p` | Next / previous new comment |
+| `[` / `]` | Previous / next page |
+| `o` / `c` | Open the link / open the comments |
+| `u` / `b` | Upvote / bookmark |
+| `Shift+R` | Reply |
+| `/` | Search |
+| `l` / `g` | Open the library / back to top |
+| `?` | Show all shortcuts |
+
+## Install
+
+Margin is not in the extension stores yet. Until it is, install it from a release or build it yourself.
+
+### From a release
+
+1. Download the zip for your browser from the [latest release](../../releases/latest): `…-chrome.zip` for Chrome, Edge, Brave, Helium, Opera and Vivaldi, or `…-firefox.zip` for Firefox.
+2. Unzip it to a folder you will keep. The browser loads the extension from that folder, so do not delete it.
+3. Follow the steps for your browser below, and choose the unzipped folder.
+
+### Chrome, Edge, Brave, Helium, Opera and Vivaldi
+
+1. Open the extensions page: `chrome://extensions` (Chrome, Helium, Brave and Vivaldi), `edge://extensions` (Edge) or `opera://extensions` (Opera).
+2. Turn on **Developer mode**.
+3. Select **Load unpacked** and choose the unzipped folder, or `.output/chrome-mv3` if you built from source.
+4. Open [news.ycombinator.com](https://news.ycombinator.com).
+
+To update, replace the folder's contents with the new version, then select the reload button on the extension's card. Your settings, history and bookmarks are kept.
+
+### Firefox
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Select **Load Temporary Add-on** and choose `manifest.json` inside the unzipped folder, or `.output/firefox-mv3/manifest.json` if you built from source.
+3. If Firefox asks, allow the extension to access news.ycombinator.com. You can also allow it from the extension's entry in `about:addons`, under **Permissions**.
+
+Firefox removes a temporary add-on when it closes. It installs unsigned add-ons permanently only in Firefox Developer Edition or Nightly, with `xpinstall.signatures.required` set to `false` in `about:config`. The add-ons store version will not have this limit.
+
+### From source
+
+You need Node 22 and pnpm 10.
+
+```sh
+git clone <this repository>
+cd <the cloned folder>
+pnpm install
+pnpm build         # writes .output/chrome-mv3 and .output/firefox-mv3
+```
+
+Then load the folder for your browser as described above.
 
 ## Privacy
 
@@ -40,20 +133,6 @@ pnpm build         # .output/chrome-mv3 and .output/firefox-mv3
 pnpm zip           # store zips in .output/, plus a sources zip for Firefox review
 pnpm icons         # regenerate public/icon/*.png from scripts/icons.mjs
 ```
-
-## Load the unpacked extension
-
-Chrome or Edge:
-
-1. Run `pnpm build`.
-2. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
-3. Select **Load unpacked** and choose `.output/chrome-mv3`.
-
-Firefox:
-
-1. Run `pnpm build`.
-2. Open `about:debugging#/runtime/this-firefox`.
-3. Select **Load Temporary Add-on** and choose `.output/firefox-mv3/manifest.json`.
 
 Before you publish to addons.mozilla.org, replace the placeholder Gecko id in `wxt.config.ts`.
 
