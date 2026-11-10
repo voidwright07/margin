@@ -14,7 +14,8 @@
     "icons": "node scripts/icons.mjs",
     "shots": "node scripts/shots.mjs",
     "postinstall": "wxt prepare",
-    "check": "tsc --noEmit && vitest run"
+    "check": "tsc --noEmit && vitest run",
+    "e2e": "node scripts/e2e.mjs"
   },
   "dependencies": {
     "preact": "^11.2.0"

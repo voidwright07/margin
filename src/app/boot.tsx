@@ -39,6 +39,13 @@ const ensureRoot = () => {
   return root;
 };
 
+/** HN links comments as item?id=…#<comment id>; the browser scrolled before the new layout existed. */
+const scrollToHash = () => {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (!id) return;
+  requestAnimationFrame(() => document.querySelector(`#${ROOT_ID} [id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'start' }));
+};
+
 const fail = (error: unknown) => {
   console.warn('[Margin] could not redesign this page; showing the original.', error);
   page = null;
@@ -66,6 +73,7 @@ const setMode = (next: Mode) => {
     case 'margin':
       try {
         render(<App page={page!} onError={fail} />, el);
+        scrollToHash();
       } catch (e) {
         fail(e);
       }

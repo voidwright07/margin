@@ -4,6 +4,7 @@ import { Header } from './Header';
 import { IconSearch } from './icons';
 import { ItemView } from './ItemView';
 import { LibraryDrawer } from './Library';
+import { ControlPad, HelpOverlay, HoverCard, KeyboardLayer, SelectionPopup } from './Overlays';
 import { usePanel } from './panels';
 import { StoryIndex } from './StoryIndex';
 import { Toasts } from './toast';
@@ -78,6 +79,11 @@ export function App({ page, onError, extras }: { page: Page; onError: (e: unknow
         </main>
         <Footer />
         <LibraryDrawer />
+        <HelpOverlay />
+        <HoverCard />
+        <SelectionPopup />
+        <KeyboardLayer />
+        {page.kind !== 'passthrough' && <ControlPad />}
         <Toasts />
         {extras}
       </div>

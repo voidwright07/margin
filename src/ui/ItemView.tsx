@@ -13,17 +13,17 @@ import { useHnToggle } from './useToggle';
 
 type ItemPage = Extract<Page, { kind: 'item' }>;
 
-function StoryText({ story, highlights }: { story: Story; highlights: Highlight[] }) {
+function StoryText({ story, highlights, canQuote }: { story: Story; highlights: Highlight[]; canQuote: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current!;
     el.innerHTML = story.text ?? '';
     applyHighlights(el, highlights);
   }, [story.text, highlights]);
-  return <div ref={ref} class="mg-toptext mg-commtext" data-mg-text data-comment-id="" />;
+  return <div ref={ref} class="mg-toptext mg-commtext" data-mg-text data-comment-id="" data-item-id={story.id} data-can-quote={String(canQuote)} />;
 }
 
-function StoryHeader({ story, newTab }: { story: Story; newTab: boolean }) {
+function StoryHeader({ story, newTab, canQuote }: { story: Story; newTab: boolean; canQuote: boolean }) {
   const { vote, score } = useStoryVote(story);
   const fave = useHnToggle('fave', story.actions.unfave, story.actions.fave);
   const flag = useHnToggle('flag', story.actions.unflag, story.actions.flag);
@@ -87,7 +87,7 @@ function StoryHeader({ story, newTab }: { story: Story; newTab: boolean }) {
           <BookmarkButton label="story" make={() => storyBookmark(story, Date.now())} />
         </span>
       </div>
-      {story.text && <StoryText story={story} highlights={own} />}
+      {story.text && <StoryText story={story} highlights={own} canQuote={canQuote} />}
     </header>
   );
 }
@@ -137,31 +137,37 @@ export function ItemView({ page: initial }: { page: ItemPage }) {
   const { root, comments, form } = page;
   const newIds = useVisit(root, comments);
   const op = root.type === 'story' ? root.by : null;
+  // HN shows reply forms to logged-out readers too, but posting needs an account; send them to log in instead.
+  const canPost = form !== null && page.meta.viewer !== null;
+  const allHighlights = useStore((s) => s.highlights);
+  const rootHighlights = useMemo(() => allHighlights.filter((h) => h.commentId === root.id), [allHighlights, root.id]);
 
   useEffect(() => {
     const onQuote = (e: Event) => {
       const { commentId, text } = (e as CustomEvent<QuoteDetail>).detail;
-      if (e.defaultPrevented || !form) return;
+      if (e.defaultPrevented || !canPost) return;
       if (commentId !== null && commentId !== root.id) return;
       setDraft((d) => d + quoteText(text));
       document.querySelector<HTMLTextAreaElement>('.mg-root-composer textarea')?.focus();
     };
     document.addEventListener(QUOTE_EVENT, onQuote);
     return () => document.removeEventListener(QUOTE_EVENT, onQuote);
-  }, [form, root.id]);
+  }, [canPost, root.id]);
 
   const rootComment =
     root.type === 'comment' ? (
       <div class="mg-root-comment">
         <CommentView
           row={{ comment: root, ancestors: [], size: 1, collapsed: false }}
+          itemId={root.story?.id ?? root.id}
+          canQuote={canPost}
           op={null}
           isNew={false}
           showStory
           onToggle={() => {}}
           onCollapseAncestor={() => {}}
           onReply={null}
-          highlights={[]}
+          highlights={rootHighlights}
           reply={null}
         />
       </div>
@@ -169,8 +175,13 @@ export function ItemView({ page: initial }: { page: ItemPage }) {
 
   return (
     <div class="mg-item">
-      {root.type === 'story' ? <StoryHeader story={root} newTab={newTab} /> : rootComment}
-      {form && (
+      {root.type === 'story' ? <StoryHeader story={root} newTab={newTab} canQuote={canPost} /> : rootComment}
+      {form && !canPost && (
+        <p class="mg-login-prompt">
+          <a class="mg-btn" href={`login?goto=${encodeURIComponent(`item?id=${root.id}`)}`}>Log in to comment</a>
+        </p>
+      )}
+      {form && canPost && (
         <div class="mg-root-composer">
           <Composer
             source={{ form }}
@@ -185,7 +196,7 @@ export function ItemView({ page: initial }: { page: ItemPage }) {
         </div>
       )}
       {comments.length > 0 && <ThreadToolbar count={comments.length} newCount={newIds.size} />}
-      <Thread comments={comments} op={op} newIds={newIds} showStory={false} onPosted={setPage} />
+      <Thread comments={comments} op={op} newIds={newIds} showStory={false} onPosted={canPost ? setPage : null} itemId={root.type === 'story' ? root.id : (root.story?.id ?? root.id)} />
       <MoreLink href={page.more} label="More comments" />
     </div>
   );

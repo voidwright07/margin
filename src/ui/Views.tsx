@@ -35,7 +35,7 @@ export function CommentListing({ page }: { page: CommentsPage }) {
       {page.comments.length === 0 ? (
         <p class="mg-empty">No comments here yet.</p>
       ) : (
-        <Thread comments={page.comments} op={null} newIds={NO_NEW} showStory onPosted={null} />
+        <Thread comments={page.comments} op={null} newIds={NO_NEW} showStory onPosted={null} itemId={null} />
       )}
       <MoreLink href={page.more} />
     </div>

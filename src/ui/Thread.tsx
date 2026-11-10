@@ -58,14 +58,14 @@ export const quoteText = (text: string) =>
     .map((l) => `> ${l}`)
     .join('\n\n')}\n\n`;
 
-function CommentBody({ comment, highlights }: { comment: Comment; highlights: Highlight[] }) {
+export function CommentBody({ comment, highlights, itemId, canQuote }: { comment: Comment; highlights: Highlight[]; itemId: number; canQuote: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current!;
     el.innerHTML = comment.html;
     applyHighlights(el, highlights);
   }, [comment.html, highlights]);
-  return <div ref={ref} class="mg-commtext" data-mg-text data-comment-id={comment.id} />;
+  return <div ref={ref} class="mg-commtext" data-mg-text data-comment-id={comment.id} data-item-id={itemId} data-can-quote={String(canQuote)} />;
 }
 
 function CommentVotes({ comment }: { comment: Comment }) {
@@ -106,8 +106,10 @@ function FaveFlag({ comment }: { comment: Comment }) {
   );
 }
 
-export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAncestor, onReply, highlights, reply }: {
+export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAncestor, onReply, highlights, reply, itemId, canQuote }: {
   row: Row;
+  itemId: number;
+  canQuote: boolean;
   op: string | null;
   isNew: boolean;
   showStory: boolean;
@@ -189,7 +191,7 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
             </span>
           )}
         </div>
-        {!collapsed && !c.deleted && <CommentBody comment={c} highlights={highlights} />}
+        {!collapsed && !c.deleted && <CommentBody comment={c} highlights={highlights} itemId={itemId} canQuote={canQuote} />}
         {!collapsed && reply}
       </div>
     </article>
@@ -198,8 +200,10 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
 
 const NO_HIGHLIGHTS: Highlight[] = [];
 
-export function Thread({ comments, op, newIds, showStory, onPosted }: {
+export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
   comments: Comment[];
+  /** The story this thread belongs to; null on listings, where each comment names its own story. */
+  itemId: number | null;
   op: string | null;
   newIds: ReadonlySet<number>;
   showStory: boolean;
@@ -258,6 +262,8 @@ export function Thread({ comments, op, newIds, showStory, onPosted }: {
           <CommentView
             key={c.id}
             row={row}
+            itemId={itemId ?? c.story?.id ?? c.id}
+            canQuote={canInline}
             op={op}
             isNew={newIds.has(c.id)}
             showStory={showStory && c.depth === 0}
