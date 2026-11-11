@@ -1,28 +1,33 @@
-import type { PageMeta, Section } from '../hn/types';
-import { updateSettings, useStore } from '../store/store';
-import { isDarkTheme } from './apply';
-import { IconClassic, IconGear, IconLibrary, IconMoon, IconSun, Logo } from './icons';
+import type { PageMeta, Section, Viewer } from '../hn/types';
+import { IconChevronDown, IconGear, IconLibrary, Logo } from './icons';
 import { SearchField } from './Search';
 import { SettingsPanel } from './SettingsPanel';
 import { usePanel } from './panels';
 
-const TABS: Array<{ label: string; href: string; sections: Section[] }> = [
+type Tab = { label: string; href: string; sections: Section[] };
+
+/** The sections most readers switch between stay in the bar; the rest sit behind More. */
+const TABS: Tab[] = [
   { label: 'Top', href: 'news', sections: ['news'] },
   { label: 'New', href: 'newest', sections: ['newest'] },
-  { label: 'Past', href: 'front', sections: ['front'] },
-  { label: 'Comments', href: 'newcomments', sections: ['newcomments'] },
   { label: 'Ask', href: 'ask', sections: ['ask'] },
   { label: 'Show', href: 'show', sections: ['show'] },
-  { label: 'Jobs', href: 'jobs', sections: ['jobs'] },
+];
+const MORE: Tab[] = [
+  { label: 'Past', href: 'front', sections: ['front'] },
   { label: 'Best', href: 'best', sections: ['best', 'bestcomments'] },
+  { label: 'Comments', href: 'newcomments', sections: ['newcomments'] },
+  { label: 'Jobs', href: 'jobs', sections: ['jobs'] },
 ];
 
+const isIn = (tab: Tab, section: Section | null) => section !== null && tab.sections.includes(section);
+
 export function Header({ meta }: { meta: PageMeta }) {
-  const theme = useStore((s) => s.settings.theme);
   const [panel, setPanel] = usePanel();
+  const toggle = (p: NonNullable<typeof panel>) => setPanel(panel === p ? null : p);
   const viewer = meta.viewer;
   const goto = encodeURIComponent(meta.url.pathname.slice(1) + meta.url.search);
-  const dark = isDarkTheme(theme);
+  const inMore = MORE.find((t) => isIn(t, meta.section));
 
   return (
     <header class="mg-top">
@@ -33,27 +38,42 @@ export function Header({ meta }: { meta: PageMeta }) {
         </a>
         <nav class="mg-tabs" aria-label="Sections">
           {TABS.map((t) => {
-            const active = meta.section !== null && t.sections.includes(meta.section);
+            const active = isIn(t, meta.section);
             return (
               <a href={t.href} class={`mg-tab${active ? ' is-active' : ''}`} aria-current={active ? 'page' : undefined}>
                 {t.label}
               </a>
             );
           })}
-          {viewer && (
-            <a href={`threads?id=${viewer.name}`} class={`mg-tab${meta.section === 'threads' && meta.url.searchParams.get('id') === viewer.name ? ' is-active' : ''}`}>
-              Threads
-            </a>
-          )}
-          <a href="submit" class="mg-tab mg-tab-submit">Submit</a>
+          <div class="mg-menu-wrap">
+            <button
+              type="button"
+              class={`mg-tab${inMore ? ' is-active' : ''}${panel === 'more' ? ' is-open' : ''}`}
+              aria-expanded={panel === 'more'}
+              aria-controls="mg-more-menu"
+              onClick={() => toggle('more')}
+            >
+              {inMore?.label ?? 'More'}
+              <IconChevronDown size={14} class="mg-tab-chev" />
+            </button>
+            {panel === 'more' && (
+              <div id="mg-more-menu" class="mg-popover mg-menu">
+                {MORE.map((t) => {
+                  const active = t === inMore;
+                  return (
+                    <a href={t.href} class={`mg-menu-item${active ? ' is-active' : ''}`} aria-current={active ? 'page' : undefined}>
+                      {t.label}
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </nav>
         <SearchField />
         <div class="mg-top-tools">
           {viewer ? (
-            <a class="mg-account" href={`user?id=${viewer.name}`} title="Your profile">
-              <span class="mg-account-name">{viewer.name}</span>
-              <span class="mg-account-karma">{viewer.karma.toLocaleString()}</span>
-            </a>
+            <AccountMenu viewer={viewer} meta={meta} open={panel === 'account'} onToggle={() => toggle('account')} />
           ) : (
             <a class="mg-btn mg-btn-ghost" href={`login?goto=${goto}`}>Log in</a>
           )}
@@ -62,37 +82,19 @@ export function Header({ meta }: { meta: PageMeta }) {
             class={`mg-icon-btn${panel === 'library' ? ' is-on' : ''}`}
             title="Library: history, bookmarks, highlights (L)"
             aria-label="Library"
-            onClick={() => setPanel(panel === 'library' ? null : 'library')}
+            onClick={() => toggle('library')}
           >
             <IconLibrary size={18} />
           </button>
           <button
             type="button"
-            class="mg-icon-btn"
-            title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-            aria-label="Toggle dark theme"
-            onClick={() => updateSettings({ theme: dark ? 'light' : 'dark' })}
-          >
-            {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
-          </button>
-          <button
-            type="button"
             class={`mg-icon-btn${panel === 'settings' ? ' is-on' : ''}`}
-            title="Appearance and settings"
+            title="Theme, text and settings"
             aria-label="Settings"
             aria-expanded={panel === 'settings'}
-            onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
+            onClick={() => toggle('settings')}
           >
             <IconGear size={18} />
-          </button>
-          <button
-            type="button"
-            class="mg-icon-btn"
-            title="Show the original Hacker News design"
-            aria-label="Show original design"
-            onClick={() => updateSettings({ enabled: false })}
-          >
-            <IconClassic size={18} />
           </button>
         </div>
         {panel === 'settings' && (
@@ -102,5 +104,41 @@ export function Header({ meta }: { meta: PageMeta }) {
         )}
       </div>
     </header>
+  );
+}
+
+function AccountMenu({ viewer, meta, open, onToggle }: { viewer: NonNullable<Viewer>; meta: PageMeta; open: boolean; onToggle: () => void }) {
+  const mine = meta.url.searchParams.get('id') === viewer.name;
+  const items = [
+    { label: 'Profile', href: `user?id=${viewer.name}`, active: mine && meta.url.pathname === '/user' },
+    { label: 'Threads', href: `threads?id=${viewer.name}`, active: mine && meta.section === 'threads' },
+    { label: 'Submit', href: 'submit', active: meta.url.pathname === '/submit' },
+  ];
+  return (
+    <div class="mg-menu-wrap">
+      <button
+        type="button"
+        class={`mg-account${open ? ' is-open' : ''}`}
+        title="Your account"
+        aria-expanded={open}
+        aria-controls="mg-account-menu"
+        onClick={onToggle}
+      >
+        <span class="mg-account-name">{viewer.name}</span>
+        <span class="mg-account-karma" title="Karma">{viewer.karma.toLocaleString()}</span>
+        <IconChevronDown size={14} class="mg-tab-chev" />
+      </button>
+      {open && (
+        <div id="mg-account-menu" class="mg-popover mg-menu mg-menu-end">
+          {items.map((i) => (
+            <a href={i.href} class={`mg-menu-item${i.active ? ' is-active' : ''}`} aria-current={i.active ? 'page' : undefined}>
+              {i.label}
+            </a>
+          ))}
+          <hr class="mg-menu-rule" />
+          <a href={viewer.logout} class="mg-menu-item">Log out</a>
+        </div>
+      )}
+    </div>
   );
 }

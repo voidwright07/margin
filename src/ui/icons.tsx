@@ -29,15 +29,6 @@ export const IconGear = (p: P) =>
     </>,
     p,
   );
-export const IconSun = (p: P) =>
-  svg(
-    <>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-    </>,
-    p,
-  );
-export const IconMoon = (p: P) => svg(<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />, p);
 export const IconBookmark = (p: P & { filled?: boolean }) =>
   svg(<path d="M6 3.5h12v17l-6-4-6 4z" />, p, p.filled ?? false);
 export const IconLibrary = (p: P) =>
@@ -45,14 +36,6 @@ export const IconLibrary = (p: P) =>
     <>
       <path d="M4 4.5h4v15H4zM10 4.5h4v15h-4z" />
       <path d="m16.2 5.2 3.8-1 3.1 14.6-3.8 1z" transform="translate(-2 0)" />
-    </>,
-    p,
-  );
-export const IconClassic = (p: P) =>
-  svg(
-    <>
-      <rect x="3.5" y="4" width="17" height="16" rx="2" />
-      <path d="M3.5 8.5h17M7 12h10M7 15.5h6" />
     </>,
     p,
   );
@@ -67,6 +50,7 @@ export const IconSearch = (p: P) =>
 export const IconComment = (p: P) => svg(<path d="M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z" />, p);
 export const IconClose = (p: P) => svg(<path d="M6 6l12 12M18 6 6 18" />, p);
 export const IconChevronLeft = (p: P) => svg(<path d="m15 5-7 7 7 7" />, p);
+export const IconChevronDown = (p: P) => svg(<path d="m6 9 6 6 6-6" />, p);
 export const IconChevronRight = (p: P) => svg(<path d="m9 5 7 7-7 7" />, p);
 export const IconKeyboard = (p: P) =>
   svg(

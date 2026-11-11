@@ -152,7 +152,7 @@ These details were settled while building and differ from, or add to, the plan a
 - Passthrough pages, and the settings form on your own profile, move HN's original nodes into the themed layout and put them back on unmount, so the old-design toggle restores an untouched DOM.
 - Logged-out readers see HN's reply form markup, but HN rejects their posts. Margin shows "Log in to comment" instead of a composer when `meta.viewer` is null, and comment replies stay plain links to HN.
 - Keyboard focus is a `data-mg-focused` attribute, not a class, because Preact rewrites `className` when a row re-renders.
-- The section tabs include Comments (`newcomments`) in addition to the sections HN lists in its header.
+- The top bar keeps four section tabs (Top, New, Ask, Show). Past, Best, Comments (`newcomments`, which HN leaves out of its header) and Jobs sit behind More, which takes the current section's name and underline when you are on one of them. Your profile, threads, Submit and Log out sit in the menu under your name. Theme and the old-design switch live in the Settings popover, so the bar has two icons: Library and Settings. The menus are `Panel` values, so at most one is open and Escape or a click on the page closes it.
 
 ### Comment threads
 
@@ -168,7 +168,7 @@ Thread styles live in `src/ui/thread.css`; the structure helpers work on the fla
 
 ## Feature checklist (ModernHN free + Pro)
 
-Free: themes, fonts, styles (width, line height, justify), history page/panel, inline reply and collapsible threads, list/table index with configurable columns, redesigned profile with tabs (about / submissions / comments / favorites), every account action, one-click old-design toggle.
+Free: themes, fonts, styles (width, line height, justify), history page/panel, inline reply and collapsible threads, list/table index with configurable columns, redesigned profile with tabs (about / submissions / comments / favorites), every account action, old-design toggle (in Settings).
 
 Pro (free here): bookmarks (stories, comments, users) and a bookmarks panel; highlighter; new-reply badges on story rows plus jumping between new comments; user hover card (reuses the user parser on a same-origin `user?id=` fetch, cached, 400 ms hover delay); selection popup (highlight, quote into reply, copy, speak via `speechSynthesis`, search HN on Margin's search page); control pad with keyboard shortcuts (`j/k` move, `Shift+J`/`Shift+K` next/prev top-level comment, `h` parent, `r` thread root, `n/p` next/prev new comment, `R` reply, `[`/`]` page, `o` open, `c` comments, `u` upvote, `b` bookmark, `x` collapse, `/` search, `?` help); date picker for `front?day=`; backup and restore as JSON.
 

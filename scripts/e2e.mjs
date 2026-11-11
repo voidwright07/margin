@@ -245,11 +245,44 @@ await check('user hover card appears after the delay with parsed karma', async (
   assert.match(await page.$eval('.mg-hovercard-meta', (e) => e.textContent), /43,706 karma/);
 });
 
+await check('top bar: More holds the quieter sections, the account menu holds your links', async () => {
+  await resetStorage();
+  await open('best');
+  const more = 'button[aria-controls="mg-more-menu"]';
+  assert.deepEqual(await page.$$eval('nav[aria-label="Sections"] > a', (els) => els.map((a) => a.textContent)), ['Top', 'New', 'Ask', 'Show']);
+  assert.deepEqual(await page.$eval(more, (b) => [b.textContent, b.classList.contains('is-active')]), ['Best', true], 'More names the section it holds');
+  await page.click(more);
+  assert.deepEqual(
+    await page.$$eval('#mg-more-menu a', (els) => els.map((a) => [a.textContent, a.getAttribute('href'), a.getAttribute('aria-current')])),
+    [['Past', 'front', null], ['Best', 'best', 'page'], ['Comments', 'newcomments', null], ['Jobs', 'jobs', null]],
+  );
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$('#mg-more-menu'), null, 'Escape closes More');
+
+  await open('news?synthetic=1');
+  assert.equal(await page.$eval(more, (b) => b.textContent), 'More');
+  await page.click('button[aria-controls="mg-account-menu"]');
+  assert.deepEqual(
+    await page.$$eval('#mg-account-menu a', (els) => els.map((a) => [a.textContent, a.getAttribute('href')])),
+    [['Profile', 'user?id=margintest'], ['Threads', 'threads?id=margintest'], ['Submit', 'submit'], ['Log out', 'logout?auth=0f0f0f&goto=news']],
+  );
+  await page.click(more);
+  assert.equal(await page.$('#mg-account-menu'), null, 'opening More closes the account menu');
+  await page.mouse.click(640, 600);
+  assert.equal(await page.$('#mg-more-menu'), null, 'a click on the page closes More');
+});
+
+// The old-design switch lives in the settings popover.
+const showOriginal = async () => {
+  await page.click('button[aria-label="Settings"]');
+  await page.click('.mg-settings-pop button::-p-text(Show the original Hacker News design)');
+};
+
 await check('old-design toggle restores the untouched page and the pill brings Margin back', async () => {
   await resetStorage();
   await open('login?goto=news');
   assert.equal(await page.$eval('#margin-root form input[name="acct"]', () => true), true, 'login form adopted');
-  await page.click('button[aria-label="Show original design"]');
+  await showOriginal();
   await page.waitForSelector('.mg-return');
   assert.equal(await page.$('#margin-root form'), null, 'form moved back out');
   assert.equal(await page.$eval('body > form input[name="acct"]', () => true), true);
@@ -995,7 +1028,7 @@ await check('in the original design, /search goes to the same search on hn.algol
   await open('search?q=rust');
   await settled();
   algolia.length = 0;
-  await page.click('button[aria-label="Show original design"]');
+  await showOriginal();
   assert.equal(await algoliaPage(), 'https://hn.algolia.com/?query=rust&type=story&sort=byPopularity&dateRange=all&page=0');
 });
 

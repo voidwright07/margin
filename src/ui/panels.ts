@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 
 /** At most one overlay is open at a time; this is its single source of truth. */
-export type Panel = 'settings' | 'library' | 'help' | null;
+export type Panel = 'settings' | 'library' | 'help' | 'more' | 'account' | null;
 
 let current: Panel = null;
 const listeners = new Set<(p: Panel) => void>();
