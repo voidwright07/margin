@@ -15,7 +15,8 @@
     "shots": "node scripts/shots.mjs",
     "postinstall": "wxt prepare",
     "check": "tsc --noEmit && vitest run",
-    "e2e": "node scripts/e2e.mjs"
+    "e2e": "node scripts/e2e.mjs",
+    "responsive": "node scripts/responsive.mjs"
   },
   "dependencies": {
     "preact": "^11.2.0"
