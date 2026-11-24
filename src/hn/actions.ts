@@ -18,18 +18,21 @@ const BY_LABEL: Record<string, AnyAction> = {
   reply: 'reply',
 };
 
-/** Vote arrows are found by id anywhere in the document; the rest by label inside `scopes`. */
+/**
+ * Vote arrows are found by id anywhere in the document, the rest by label inside `scopes`. The id lookup must
+ * use the document's id index: a selector scans the whole page, and a big thread runs thousands of lookups.
+ */
 export const collectActions = <A extends AnyAction>(
   scopes: Array<Element | null | undefined>,
-  doc: ParentNode,
+  doc: Document,
   id: number,
   allowed: readonly A[],
 ): Partial<Record<A, Href>> => {
   const found = new Map<AnyAction, Href>();
   const arrow = (prefix: string, key: AnyAction) => {
-    const a = doc.querySelector(`a[id="${prefix}_${id}"]`);
+    const a = doc.getElementById(`${prefix}_${id}`);
     const h = hrefOf(a);
-    if (a && h && !a.classList.contains('nosee')) found.set(key, h);
+    if (a?.tagName === 'A' && h && !a.classList.contains('nosee')) found.set(key, h);
   };
   arrow('up', 'upvote');
   arrow('down', 'downvote');

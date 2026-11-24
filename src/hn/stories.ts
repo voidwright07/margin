@@ -4,7 +4,7 @@ import { moreOf, parseMeta } from './meta';
 import type { Href, Page, Story } from './types';
 
 /** Parse one `tr.athing.submission` and the subtext row that follows it. */
-export const parseStoryRow = (row: Element, doc: ParentNode): Story => {
+export const parseStoryRow = (row: Element, doc: Document): Story => {
   const id = Number(row.getAttribute('id'));
   const titleline = row.querySelector('.titleline');
   const link = titleline?.querySelector('a') ?? null;

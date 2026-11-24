@@ -6,7 +6,7 @@ import type { Comment, Page } from './types';
 type CommentRow = Omit<Comment, 'parentId'> & { parentLink: number | null };
 
 /** Parse one comment row: `tr.athing.comtr` on trees, plain `tr.athing` on listings. */
-export const parseCommentRow = (row: Element, doc: ParentNode): CommentRow => {
+export const parseCommentRow = (row: Element, doc: Document): CommentRow => {
   const id = Number(row.getAttribute('id'));
   const head = row.querySelector('span.comhead');
   const commtext = row.querySelector('.commtext');
