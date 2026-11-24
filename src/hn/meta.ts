@@ -25,7 +25,7 @@ const parseNotice = (doc: Document): string | null => {
 };
 
 export const parseMeta = (doc: Document, url: URL): PageMeta => ({
-  viewer: parseViewer(doc),
+  viewer: doc.querySelector('#hnmain') ? parseViewer(doc) : 'unknown',
   url,
   section: parseSection(doc),
   notice: parseNotice(doc),

@@ -8,7 +8,7 @@ import { plural } from './common';
 import { IconChevronLeft, IconClose, IconKeyboard } from './icons';
 import { COMMANDS, handleKey, jumpNew, move } from './keyboard';
 import { usePanel } from './panels';
-import { QUOTE_EVENT, type QuoteDetail } from './Thread';
+import { QUOTE_EVENT, type QuoteDetail } from './Composer';
 import { toast } from './toast';
 
 /** Binds the shortcut table to the page while keyboard shortcuts are on. */
@@ -238,7 +238,7 @@ export function SelectionPopup() {
           [
             'Quote',
             () => {
-              document.dispatchEvent(new CustomEvent<QuoteDetail>(QUOTE_EVENT, { detail: { commentId: sel.commentId, text: sel.text }, cancelable: true }));
+              document.dispatchEvent(new CustomEvent<QuoteDetail>(QUOTE_EVENT, { detail: { commentId: sel.commentId, text: sel.text } }));
               done();
             },
           ],

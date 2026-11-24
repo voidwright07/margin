@@ -21,6 +21,7 @@ describe('search route', () => {
     const p = page('<html><head></head><body>Unknown.</body></html>', 'search?q=rust&type=comment&p=2');
     expect(p.kind).toBe('search');
     expect(p.kind === 'search' && p.query).toEqual(q({ q: 'rust', type: 'comment', page: 2 }));
+    expect(p.meta.viewer).toBe('unknown');
   });
 
   it('needs both the path and the body', () => {

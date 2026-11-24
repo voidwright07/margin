@@ -7,7 +7,7 @@ import type { Comment, PageMeta } from '../src/hn/types';
 import { frontDay } from '../src/ui/FrontDayNav';
 import { applyHighlights } from '../src/ui/highlight';
 import { collapsedPreview, markQuotes, plainText } from '../src/ui/commentText';
-import { subtreeSizes, visibleRows } from '../src/ui/Thread';
+import { hasLaterSibling, subtreeSizes, visibleRows } from '../src/ui/Thread';
 import { navTarget } from '../src/ui/threadNav';
 
 const itemDoc = () => parseHTML(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'item.html'), 'utf8')).document as unknown as Document;
@@ -46,6 +46,54 @@ describe('collapsing works on the flat comment array', () => {
     for (const row of rows) {
       expect(row.ancestors).toHaveLength(row.comment.depth);
       if (row.comment.depth > 0) expect(row.ancestors.at(-1)).toBe(row.comment.parentId);
+    }
+  });
+});
+
+describe('thread lines bend into each reply', () => {
+  // Only depth and id matter to the line layout.
+  const tree = (depths: number[]) => depths.map((depth, i) => ({ id: i + 1, depth }) as Comment);
+  const layout = (depths: number[], collapsed: number[] = []) => {
+    const comments = tree(depths);
+    return visibleRows(comments, subtreeSizes(comments), new Set(collapsed)).map((r) => [r.comment.id, r.lines.join(' '), r.repliesShown]);
+  };
+
+  it('a reply bends in with a tee while siblings follow, and the last one ends the line', () => {
+    expect(layout([0, 1, 2, 1, 0])).toEqual([
+      [1, '', true],
+      [2, 'tee', true],
+      [3, 'pipe end', false],
+      [4, 'end', false],
+      [5, '', false],
+    ]);
+  });
+
+  it('a finished branch leaves a blank column, not a line to nowhere', () => {
+    expect(layout([0, 1, 2, 3, 2])).toEqual([
+      [1, '', true],
+      [2, 'end', true],
+      [3, 'none tee', true],
+      [4, 'none pipe end', false],
+      [5, 'none end', false],
+    ]);
+  });
+
+  it('collapsing hides the replies, so the collapsed comment has no line of its own', () => {
+    expect(layout([0, 1, 2, 1], [2])).toEqual([
+      [1, '', true],
+      [2, 'tee', false],
+      [4, 'end', false],
+    ]);
+  });
+
+  it('on the captured thread, a bend ends exactly where the parent has no later reply', () => {
+    const comments = itemComments();
+    const later = hasLaterSibling(comments);
+    for (const row of visibleRows(comments, subtreeSizes(comments), new Set())) {
+      if (row.comment.depth === 0) continue;
+      const next = comments.slice(row.index + 1).find((c) => c.depth <= row.comment.depth);
+      expect(row.lines.at(-1)).toBe(next?.depth === row.comment.depth ? 'tee' : 'end');
+      expect(later[row.index]).toBe(next?.depth === row.comment.depth);
     }
   });
 });

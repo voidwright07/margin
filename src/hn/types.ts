@@ -25,7 +25,8 @@ export type Section = (typeof SECTIONS)[number];
 export type Viewer = { name: string; karma: number; logout: Href } | null;
 
 export type PageMeta = {
-  viewer: Viewer;
+  /** 'unknown' on replies outside HN's page frame (search's "Unknown.", the login page): they have no top bar. */
+  viewer: Viewer | 'unknown';
   url: URL;
   section: Section | null;
   notice: string | null;

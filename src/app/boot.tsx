@@ -109,10 +109,14 @@ export const boot = async () => {
   const hint = readBootHint();
   html.dataset.mgTheme = hint?.theme ?? 'system';
   if (hint?.enabled ?? true) html.classList.add('mg-loading');
-  // Never leave the page hidden, whatever goes wrong below.
-  const failsafe = setTimeout(() => html.classList.remove('mg-loading'), 3000);
+  // Never leave the page hidden, whatever goes wrong below. The clock starts once the HTML has arrived: a big
+  // thread can take longer than this to download, and revealing it early flashes the original page.
+  let failsafe: ReturnType<typeof setTimeout> | undefined;
+  const ready = domReady().then(() => {
+    failsafe = setTimeout(() => html.classList.remove('mg-loading'), 3000);
+  });
 
-  const [state] = await Promise.all([loadState(), domReady()]);
+  const [state] = await Promise.all([loadState(), ready]);
   try {
     page = parsePage(document, new URL(location.href));
   } catch (e) {

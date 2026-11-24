@@ -7,7 +7,7 @@ import { BookmarkButton, MoreLink, plural, UserLink } from './common';
 import { Composer } from './Composer';
 import { applyHighlights } from './highlight';
 import { IconUp } from './icons';
-import { CommentView, QUOTE_EVENT, quoteText, Thread, type QuoteDetail } from './Thread';
+import { CommentView, Thread } from './Thread';
 import { useStoryVote } from './StoryIndex';
 import { useHnToggle } from './useToggle';
 
@@ -132,33 +132,22 @@ function ThreadToolbar({ count, newCount }: { count: number; newCount: number })
 
 export function ItemView({ page: initial }: { page: ItemPage }) {
   const [page, setPage] = useState(initial);
-  const [draft, setDraft] = useState('');
   const newTab = useStore((s) => s.settings.openLinksInNewTab);
   const { root, comments, form } = page;
   const newIds = useVisit(root, comments);
   const op = root.type === 'story' ? root.by : null;
   // HN shows reply forms to logged-out readers too, but posting needs an account; send them to log in instead.
-  const canPost = form !== null && page.meta.viewer !== null;
+  const canPost = form !== null && page.meta.viewer !== null && page.meta.viewer !== 'unknown';
   const allHighlights = useStore((s) => s.highlights);
   const rootHighlights = useMemo(() => allHighlights.filter((h) => h.commentId === root.id), [allHighlights, root.id]);
-
-  useEffect(() => {
-    const onQuote = (e: Event) => {
-      const { commentId, text } = (e as CustomEvent<QuoteDetail>).detail;
-      if (e.defaultPrevented || !canPost) return;
-      if (commentId !== null && commentId !== root.id) return;
-      setDraft((d) => d + quoteText(text));
-      document.querySelector<HTMLTextAreaElement>('.mg-root-composer textarea')?.focus();
-    };
-    document.addEventListener(QUOTE_EVENT, onQuote);
-    return () => document.removeEventListener(QUOTE_EVENT, onQuote);
-  }, [canPost, root.id]);
+  // Quotes from the story text (no comment id) or from the root comment go in the top box.
+  const quotesForRoot = useMemo(() => (id: number | null) => id === null || id === root.id, [root.id]);
 
   const rootComment =
     root.type === 'comment' ? (
       <div class="mg-root-comment">
         <CommentView
-          row={{ comment: root, index: 0, ancestors: [], size: 1, collapsed: false }}
+          row={{ comment: root, index: 0, ancestors: [], lines: [], size: 1, collapsed: false, repliesShown: false }}
           itemId={root.story?.id ?? root.id}
           canQuote={canPost}
           op={null}
@@ -187,13 +176,9 @@ export function ItemView({ page: initial }: { page: ItemPage }) {
         <div class="mg-root-composer">
           <Composer
             source={{ form }}
-            draft={draft}
-            onDraft={setDraft}
+            quotesFor={quotesForRoot}
             submitLabel={root.type === 'story' ? 'Add comment' : 'Reply'}
-            onPosted={(next) => {
-              setDraft('');
-              setPage(next);
-            }}
+            onPosted={setPage}
           />
         </div>
       )}

@@ -247,14 +247,14 @@ await check('user hover card appears after the delay with parsed karma', async (
 
 await check('top bar: More holds the quieter sections, the account menu holds your links', async () => {
   await resetStorage();
-  await open('best');
+  await open('ask');
   const more = 'button[aria-controls="mg-more-menu"]';
-  assert.deepEqual(await page.$$eval('nav[aria-label="Sections"] > a', (els) => els.map((a) => a.textContent)), ['Top', 'New', 'Ask', 'Show']);
-  assert.deepEqual(await page.$eval(more, (b) => [b.textContent, b.classList.contains('is-active')]), ['Best', true], 'More names the section it holds');
+  assert.deepEqual(await page.$$eval('nav[aria-label="Sections"] > a', (els) => els.map((a) => a.textContent)), ['Top', 'New', 'Best', 'Show']);
+  assert.deepEqual(await page.$eval(more, (b) => [b.textContent, b.classList.contains('is-active')]), ['Ask', true], 'More names the section it holds');
   await page.click(more);
   assert.deepEqual(
     await page.$$eval('#mg-more-menu a', (els) => els.map((a) => [a.textContent, a.getAttribute('href'), a.getAttribute('aria-current')])),
-    [['Past', 'front', null], ['Best', 'best', 'page'], ['Comments', 'newcomments', null], ['Jobs', 'jobs', null]],
+    [['Ask', 'ask', 'page'], ['Past', 'front', null], ['Comments', 'newcomments', null], ['Jobs', 'jobs', null]],
   );
   await page.keyboard.press('Escape');
   assert.equal(await page.$('#mg-more-menu'), null, 'Escape closes More');
@@ -379,7 +379,7 @@ await check('Shift+J, Shift+K, h and r move focus by thread structure', async ()
 await check('past depth 6 a comment says who it replies to, and the preview shows that parent', async () => {
   await resetStorage();
   await open('item?id=9200');
-  const rails = await page.$$eval('[id="9210"] .mg-rail', (r) => r.length);
+  const rails = await page.$$eval('[id="9210"] .mg-rails > .mg-rail', (r) => r.length);
   assert.equal(rails, 6, 'rails stop at the cap');
   const visible = (id) => page.$eval(`[id="${id}"] .mg-c-replyto`, (el) => el.checkVisibility()).catch(() => false);
   assert.equal(await visible(9207), false, 'depth 6 has no label');
@@ -396,8 +396,39 @@ await check('past depth 6 a comment says who it replies to, and the preview show
   assert.equal(await page.$eval('[id="9210"] .mg-parentpop-head b', (b) => b.textContent), 'cole', 'keyboard focus opens the preview too');
   await page.setViewport({ width: 390, height: 844 });
   assert.equal(await visible(9205), true, 'mobile shows the label from depth 4');
-  assert.equal(await page.$$eval('[id="9205"] .mg-rail', (r) => r.filter((x) => x.checkVisibility()).length), 3, 'mobile caps rails at 3');
+  assert.equal(await page.$$eval('[id="9205"] .mg-rails > .mg-rail', (r) => r.filter((x) => x.checkVisibility()).length), 3, 'mobile caps rails at 3');
   await page.setViewport({ width: 1280, height: 1000 });
+});
+
+await check("thread lines bend into each reply, and each comment's own line runs to its first reply", async () => {
+  await resetStorage();
+  await open('item?id=50442736');
+  const g = await page.evaluate(() => {
+    const parent = document.querySelector('.mg-c.is-top:has(.mg-rail-own)');
+    const id = parent.dataset.id;
+    const own = parent.querySelector('.mg-rail-own').getBoundingClientRect();
+    const replies = [...document.querySelectorAll('.mg-c')].filter((c) => c.querySelector('.mg-rails > .mg-rail:last-child')?.dataset.anc === id);
+    const first = replies[0];
+    const bend = first.querySelector('.mg-rails > .mg-rail:last-child');
+    const after = getComputedStyle(bend, '::after');
+    const head = first.querySelector('.mg-c-head').getBoundingClientRect();
+    const row = first.getBoundingClientRect();
+    return {
+      id,
+      gap: Math.abs(own.bottom - row.top),
+      bendY: parseFloat(after.top) + parseFloat(after.height) - 1,
+      headMid: head.top - row.top + Math.min(head.height, 20) / 2,
+      kinds: replies.map((r) => r.querySelector('.mg-rails > .mg-rail:last-child').dataset.line),
+    };
+  });
+  assert.ok(g.gap <= 1, `own line meets the first reply (gap ${g.gap}px)`);
+  assert.ok(Math.abs(g.bendY - g.headMid) <= 3, `bend lands on the header line (${g.bendY} vs ${g.headMid})`);
+  assert.ok(g.kinds.length > 1, 'the parent has several direct replies');
+  assert.deepEqual(g.kinds, [...g.kinds.slice(0, -1).map(() => 'tee'), 'end'], 'only the last reply ends the line');
+  await page.hover(`[id="${g.id}"] .mg-rail-own`);
+  assert.equal(await page.$$eval(`.mg-rail[data-anc="${g.id}"]:not(.is-hot)`, (r) => r.length), 0, 'hovering the line lights the whole branch');
+  await page.click(`[id="${g.id}"] .mg-rail-own`);
+  assert.equal(await isCollapsed(Number(g.id)), true, 'clicking the line collapses the comment');
 });
 
 await check('collapsed comments stay collapsed after a reload', async () => {
@@ -783,6 +814,22 @@ await check('typing a query fetches the correct API URL once, after the pause', 
   assert.equal(await page.$eval('.mg-search-summary span', (s) => s.textContent), '61,306 results', 'no page count while scrolling loads more');
   assert.equal(await here(), 'search?q=rust', 'URL follows the query');
   assert.equal(await page.evaluate(() => history.length), before, 'typing replaces, never pushes');
+});
+
+await check('search keeps the top bar logged in', async () => {
+  await resetStorage();
+  overrides.set('lists', { body: fixture('synthetic/news-loggedin.html') });
+  await open('search?q=rust');
+  await page.waitForSelector('.mg-account-name', { timeout: 3000 });
+  assert.equal(await page.$eval('.mg-account-name', (s) => s.textContent), 'margintest');
+  assert.equal(await page.$('.mg-top-tools a[href^="login"]'), null, 'no Log in link');
+  await page.click('button[aria-controls="mg-account-menu"]');
+  assert.equal(await page.$eval('#mg-account-menu a:last-child', (a) => a.getAttribute('href')), 'logout?auth=0f0f0f&goto=news');
+
+  overrides.clear();
+  await open('search?q=rust');
+  await page.waitForSelector('.mg-top-tools a[href^="login"]', { timeout: 3000 });
+  assert.equal(await page.$('.mg-account-name'), null, 'logged out reads as logged out');
 });
 
 await check('type, sort and range change the request', async () => {

@@ -5,7 +5,7 @@ import type { Highlight } from '../store/schema';
 import { getState, update, useStore } from '../store/store';
 import { BookmarkButton, UserLink } from './common';
 import { collapsedPreview, markQuotes } from './commentText';
-import { Composer } from './Composer';
+import { Composer, QUOTE_EVENT, quoteText, type QuoteDetail } from './Composer';
 import { applyHighlights } from './highlight';
 import { IconDown, IconUp } from './icons';
 import { focusComment } from './keyboard';
@@ -32,22 +32,63 @@ export const subtreeSizes = (comments: Comment[]): number[] => {
   return sizes;
 };
 
-type Row = { comment: Comment; index: number; ancestors: number[]; size: number; collapsed: boolean };
+/**
+ * What one rail column draws in a row. Column k carries the line of the ancestor at depth k. In the last column
+ * that line bends into this comment: 'tee' when a later sibling keeps the line going, 'end' when this is the
+ * last reply. Columns further left pass straight through ('pipe') while that branch has more replies below,
+ * and are blank ('none') once it has ended.
+ */
+export type Line = 'pipe' | 'none' | 'tee' | 'end';
+
+type Row = {
+  comment: Comment;
+  index: number;
+  ancestors: number[];
+  lines: Line[];
+  size: number;
+  collapsed: boolean;
+  /** The next visible row is a reply, so this comment's own line runs down to it. */
+  repliesShown: boolean;
+};
+
+/** For each comment, whether another reply to the same parent follows it. One backward pass over the flat array. */
+export const hasLaterSibling = (comments: Comment[]): boolean[] => {
+  const later = comments.map(() => false);
+  const seen: boolean[] = [];
+  for (let i = comments.length - 1; i >= 0; i--) {
+    const d = comments[i]!.depth;
+    later[i] = seen[d] === true;
+    seen.length = d;
+    seen[d] = true;
+  }
+  return later;
+};
 
 /** Walk the flat array once, skipping everything under a collapsed comment until depth returns to its level. */
 export const visibleRows = (comments: Comment[], sizes: number[], collapsed: ReadonlySet<number>): Row[] => {
+  const later = hasLaterSibling(comments);
   const rows: Row[] = [];
   const ancestors: number[] = [];
+  const path: number[] = []; // indices of the comments on the way down to this one, by depth
   let skipBelow = Infinity;
   comments.forEach((comment, i) => {
     if (comment.depth > skipBelow) return;
     skipBelow = Infinity;
-    ancestors.length = comment.depth;
+    const d = comment.depth;
+    ancestors.length = d;
+    path.length = d;
+    path[d] = i;
+    const lines = ancestors.map((_, k): Line => {
+      if (k === d - 1) return later[i] ? 'tee' : 'end';
+      const branch = path[k + 1];
+      return branch !== undefined && later[branch] ? 'pipe' : 'none';
+    });
     const isCollapsed = collapsed.has(comment.id);
-    rows.push({ comment, index: i, ancestors: [...ancestors], size: sizes[i]!, collapsed: isCollapsed });
-    ancestors[comment.depth] = comment.id;
-    if (isCollapsed) skipBelow = comment.depth;
+    rows.push({ comment, index: i, ancestors: [...ancestors], lines, size: sizes[i]!, collapsed: isCollapsed, repliesShown: false });
+    ancestors[d] = comment.id;
+    if (isCollapsed) skipBelow = d;
   });
+  rows.forEach((row, j) => (row.repliesShown = (rows[j + 1]?.comment.depth ?? -1) > row.comment.depth));
   return rows;
 };
 
@@ -55,17 +96,6 @@ export const visibleRows = (comments: Comment[], sizes: number[], collapsed: Rea
 const setHot = (id: number, on: boolean) => {
   for (const el of Array.from(document.querySelectorAll(`.mg-rail[data-anc="${id}"]`))) el.classList.toggle('is-hot', on);
 };
-
-/** A selection popup asks for a quote by dispatching this event on document. */
-export type QuoteDetail = { commentId: number | null; text: string };
-export const QUOTE_EVENT = 'margin:quote';
-
-export const quoteText = (text: string) =>
-  `${text
-    .trim()
-    .split(/\n+/)
-    .map((l) => `> ${l}`)
-    .join('\n\n')}\n\n`;
 
 export function CommentBody({ comment, highlights, itemId, canQuote }: { comment: Comment; highlights: Highlight[]; itemId: number; canQuote: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -211,12 +241,14 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
       aria-label={c.deleted ? 'Deleted comment' : `Comment by ${c.by}`}
     >
       <div class="mg-rails" aria-hidden="true">
-        {ancestors.slice(0, RAIL_CAP.wide).map((id) => (
+        {ancestors.slice(0, RAIL_CAP.wide).map((id, k) => (
           <button
             type="button"
             tabIndex={-1}
             class="mg-rail"
             data-anc={id}
+            data-level={k}
+            data-line={row.lines[k]}
             title="Collapse this thread"
             onClick={() => onCollapseAncestor(id)}
             onMouseEnter={() => setHot(id, true)}
@@ -285,8 +317,26 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
             </span>
           )}
         </div>
-        {!collapsed && !c.deleted && <CommentBody comment={c} highlights={highlights} itemId={itemId} canQuote={canQuote} />}
-        {!collapsed && reply}
+        {!collapsed && (
+          <div class="mg-c-body">
+            {row.repliesShown && c.depth < RAIL_CAP.wide && (
+              <button
+                type="button"
+                tabIndex={-1}
+                class="mg-rail mg-rail-own"
+                aria-hidden="true"
+                data-anc={c.id}
+                data-level={c.depth}
+                title="Collapse this thread"
+                onClick={onToggle}
+                onMouseEnter={() => setHot(c.id, true)}
+                onMouseLeave={() => setHot(c.id, false)}
+              />
+            )}
+            {!c.deleted && <CommentBody comment={c} highlights={highlights} itemId={itemId} canQuote={canQuote} />}
+            {reply}
+          </div>
+        )}
       </div>
     </article>
   );
@@ -305,7 +355,8 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
 }) {
   // Collapse state persists on the story's history entry; listings span many stories and keep it in memory only.
   const [collapsed, setCollapsedIds] = useState<ReadonlySet<number>>(() => new Set(itemId === null ? [] : (getState().history[String(itemId)]?.collapsed ?? [])));
-  const [reply, setReply] = useState<{ id: number; draft: string } | null>(null);
+  // The open reply box and the text it starts with; the box keeps what is typed after that.
+  const [reply, setReply] = useState<{ id: number; seed: string } | null>(null);
   const allHighlights = useStore((s) => s.highlights);
   const sizes = useMemo(() => subtreeSizes(comments), [comments]);
   const highlightsByComment = useMemo(() => {
@@ -336,8 +387,8 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
       const { commentId, text } = (e as CustomEvent<QuoteDetail>).detail;
       const target = comments.find((c) => c.id === commentId);
       if (!target || !onPosted || !target.actions.reply) return;
-      e.preventDefault();
-      setReply((r) => ({ id: target.id, draft: (r?.id === target.id ? r.draft : '') + quoteText(text) }));
+      // An open box for this comment takes the quote itself.
+      setReply((r) => (r?.id === target.id ? r : { id: target.id, seed: quoteText(text) }));
     };
     const onCollapseAll = (e: Event) => {
       const all = (e as CustomEvent<boolean>).detail;
@@ -369,7 +420,7 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
             showStory={showStory && c.depth === 0}
             onToggle={() => toggle(c.id)}
             onCollapseAncestor={collapseAncestor}
-            onReply={canInline ? () => setReply(reply?.id === c.id ? null : { id: c.id, draft: reply?.id === c.id ? reply.draft : '' }) : null}
+            onReply={canInline ? () => setReply(reply?.id === c.id ? null : { id: c.id, seed: '' }) : null}
             highlights={highlightsByComment.get(c.id) ?? NO_HIGHLIGHTS}
             parent={at(navTarget(comments, row.index, 'parent'))}
             root={at(navTarget(comments, row.index, 'root'))}
@@ -377,8 +428,8 @@ export function Thread({ comments, op, newIds, showStory, onPosted, itemId }: {
               reply?.id === c.id && onPosted && c.actions.reply ? (
                 <Composer
                   source={{ replyHref: c.actions.reply }}
-                  draft={reply.draft}
-                  onDraft={(draft) => setReply({ id: c.id, draft })}
+                  seed={reply.seed}
+                  quotesFor={(id) => id === c.id}
                   onPosted={(page) => {
                     setReply(null);
                     onPosted(page);

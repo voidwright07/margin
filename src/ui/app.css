@@ -3,6 +3,36 @@
 html.mg-loading body {
   visibility: hidden !important;
 }
+/* While the page is hidden, a spinner fades in only if the wait runs long, as it does on big threads. */
+html.mg-loading::after {
+  content: '';
+  position: fixed;
+  top: calc(50% - 14px);
+  left: calc(50% - 14px);
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation:
+    mg-boot-in 0.2s ease 0.5s both,
+    mg-boot-spin 0.8s linear infinite;
+}
+@keyframes mg-boot-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes mg-boot-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.mg-loading::after {
+    animation: mg-boot-in 0.2s ease 0.5s both;
+  }
+}
 html.mg-loading,
 html.mg-on,
 html.mg-raw {
@@ -169,6 +199,9 @@ html.mg-on body > center {
 .mg-account:hover,
 .mg-account.is-open {
   background: var(--bg-hover);
+}
+.mg-account .mg-account-initial {
+  display: none;
 }
 .mg-account-karma {
   padding: 2px 7px;
@@ -946,42 +979,14 @@ html.mg-on body > center {
   align-items: stretch;
   scroll-margin-top: calc(var(--mg-top-h) + 16px);
 }
-.mg-rails {
-  display: flex;
-  flex: none;
-}
-.mg-rail {
-  position: relative;
-  width: 22px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-.mg-rail::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 11px;
-  width: 2px;
-  background: var(--rail);
-  transition: background 0.12s ease, width 0.12s ease;
-}
-.mg-rail.is-hot::before {
-  width: 3px;
-  left: 10px;
-  background: var(--rail-hot);
-}
 .mg-c-main {
+  --c-pad: 6px;
+  --c-pad-b: 8px;
+  position: relative;
   flex: 1;
   min-width: 0;
-  padding: 10px 4px 8px 6px;
+  padding: 10px 4px var(--c-pad-b) var(--c-pad);
   border-radius: 6px;
-}
-.mg-c.is-new > .mg-c-main {
-  box-shadow: inset 2px 0 0 var(--accent);
-  padding-left: 12px;
 }
 .mg-c[data-mg-focused] {
   background: transparent;
@@ -1063,7 +1068,7 @@ html.mg-on body > center {
   color: var(--accent-ink);
 }
 .mg-c.is-collapsed .mg-c-main {
-  padding-bottom: 6px;
+  --c-pad-b: 6px;
 }
 .mg-c-acts {
   display: inline-flex;
@@ -1643,6 +1648,33 @@ html.mg-raw .rank {
   .mg-account-karma {
     display: none;
   }
+  .mg-tabs .mg-menu {
+    left: auto;
+    right: 0;
+  }
+  /* The wrap scrolls sideways here, so a sticky header would stick inside it, a top bar's height down. */
+  .mg-table th {
+    position: static;
+  }
+  .mg-adopted form table,
+  .mg-adopted form tbody,
+  .mg-adopted form tr,
+  .mg-adopted form td {
+    display: block;
+  }
+  .mg-adopted form tr {
+    padding: 4px 0;
+  }
+  .mg-adopted form td {
+    padding: 2px 0;
+  }
+  .mg-adopted form td[valign] {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .mg-adopted textarea {
+    width: 100%;
+  }
   .mg-main {
     padding: 14px 14px 40px;
   }
@@ -1663,15 +1695,6 @@ html.mg-raw .rank {
   }
   .mg-story-rail .mg-rank {
     display: none;
-  }
-  .mg-rail {
-    width: 12px;
-  }
-  .mg-rail::before {
-    left: 5px;
-  }
-  .mg-rail.is-hot::before {
-    left: 4px;
   }
   .mg-item-meta,
   .mg-toptext {
@@ -1955,7 +1978,7 @@ html.mg-raw .rank {
 .mg-rot-90 {
   transform: rotate(-90deg);
 }
-@media (max-width: 760px) {
+@media (max-width: 1000px) {
   .mg-pad {
     display: none;
   }
@@ -2104,6 +2127,8 @@ html.mg-raw .rank {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 .mg-search-seg {
   display: inline-flex;
@@ -2351,5 +2376,35 @@ html.mg-raw .rank {
   .mg-top-tools {
     order: 2;
     margin-left: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .mg-keys {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The narrowest phones: your initial stands in for your name, so search keeps room to read. */
+@media (max-width: 480px) {
+  .mg-account {
+    gap: 4px;
+    padding: 0 4px 0 6px;
+  }
+  .mg-account .mg-account-initial {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+  }
+  .mg-account-name {
+    display: none;
+  }
+  .mg-subtabs a {
+    padding: 9px 6px;
+    font-size: 13.5px;
+  }
+  .mg-search-seg a {
+    padding: 0 8px;
   }
 }

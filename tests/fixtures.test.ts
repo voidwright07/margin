@@ -215,7 +215,7 @@ const CASES: Case[] = [
   {
     file: 'login.html', path: 'login?goto=news', kind: 'passthrough',
     check: (page) => {
-      expect(page.meta.viewer).toBeNull();
+      expect(page.meta.viewer).toBe('unknown');
       expect(page.meta.notice).toBeNull();
     },
   },
@@ -251,7 +251,7 @@ const CASES: Case[] = [
     file: 'synthetic/item-loggedin.html', path: 'item?id=9100', kind: 'item',
     check: (page) => {
       const p = as(page, 'item');
-      expect(p.meta.viewer?.name).toBe('margintest');
+      expect(p.meta.viewer).toMatchObject({ name: 'margintest' });
       expect(p.root.type === 'story' && p.root.actions).toMatchObject({ unfave: 'fave?id=9100&un=t&auth=bb0', flag: 'flag?id=9100&auth=bb0&goto=item%3Fid%3D9100' });
       expect(p.comments.map((c) => [c.id, c.depth, c.parentId])).toEqual([[9101, 0, 9100], [9102, 1, 9101], [9103, 2, 9102], [9104, 0, 9100]]);
       const [voted, own, deleted, dead] = p.comments;

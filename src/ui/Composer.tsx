@@ -4,16 +4,32 @@ import type { Href, Page, ReplyForm } from '../hn/types';
 
 type Source = { form: ReplyForm } | { replyHref: Href };
 
-/** Inline reply box. Root replies use the page's form; comment replies fetch reply?id= for its hmac first. */
-export function Composer({ source, draft, onDraft, onPosted, onCancel, submitLabel = 'Reply', autoFocus }: {
+/** A selection popup asks for a quote by dispatching this event on document. */
+export type QuoteDetail = { commentId: number | null; text: string };
+export const QUOTE_EVENT = 'margin:quote';
+
+export const quoteText = (text: string) =>
+  `${text
+    .trim()
+    .split(/\n+/)
+    .map((l) => `> ${l}`)
+    .join('\n\n')}\n\n`;
+
+/**
+ * Inline reply box. Root replies use the page's form; comment replies fetch reply?id= for its hmac first.
+ * The box owns its text, so a keystroke re-renders only the box, never the thread around it.
+ */
+export function Composer({ source, seed = '', quotesFor, onPosted, onCancel, submitLabel = 'Reply', autoFocus }: {
   source: Source;
-  draft: string;
-  onDraft: (text: string) => void;
+  seed?: string;
+  /** Whether a quote from this comment (null: the story) belongs in this box. */
+  quotesFor: (commentId: number | null) => boolean;
   onPosted: (page: Extract<Page, { kind: 'item' }>) => void;
   onCancel?: () => void;
   submitLabel?: string;
   autoFocus?: boolean;
 }) {
+  const [draft, setDraft] = useState(seed);
   const [status, setStatus] = useState<{ phase: 'idle' } | { phase: 'posting' } | { phase: 'error'; message: string }>({ phase: 'idle' });
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -24,6 +40,17 @@ export function Composer({ source, draft, onDraft, onPosted, onCancel, submitLab
     el.setSelectionRange(el.value.length, el.value.length);
   }, [autoFocus]);
 
+  useEffect(() => {
+    const onQuote = (e: Event) => {
+      const { commentId, text } = (e as CustomEvent<QuoteDetail>).detail;
+      if (!quotesFor(commentId)) return;
+      setDraft((d) => d + quoteText(text));
+      ref.current?.focus();
+    };
+    document.addEventListener(QUOTE_EVENT, onQuote);
+    return () => document.removeEventListener(QUOTE_EVENT, onQuote);
+  }, [quotesFor]);
+
   const submit = async (e: Event) => {
     e.preventDefault();
     if (!draft.trim() || status.phase === 'posting') return;
@@ -32,6 +59,7 @@ export function Composer({ source, draft, onDraft, onPosted, onCancel, submitLab
       const form = 'form' in source ? source.form : await fetchReplyForm(source.replyHref);
       const page = await postReply(form, draft);
       setStatus({ phase: 'idle' });
+      setDraft('');
       onPosted(page);
     } catch (err) {
       setStatus({ phase: 'error', message: err instanceof HnError ? err.message : 'Could not reach Hacker News. Your text is still here; try again.' });
@@ -47,7 +75,7 @@ export function Composer({ source, draft, onDraft, onPosted, onCancel, submitLab
         value={draft}
         placeholder="Write a reply"
         aria-label="Reply text"
-        onInput={(e) => onDraft((e.currentTarget as HTMLTextAreaElement).value)}
+        onInput={(e) => setDraft((e.currentTarget as HTMLTextAreaElement).value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit(e);
           if (e.key === 'Escape' && onCancel) onCancel();

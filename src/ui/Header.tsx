@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'preact/hooks';
+import { fetchViewer } from '../app/hn-client';
 import type { PageMeta, Section, Viewer } from '../hn/types';
 import { IconChevronDown, IconGear, IconLibrary, Logo } from './icons';
 import { SearchField } from './Search';
@@ -10,22 +12,35 @@ type Tab = { label: string; href: string; sections: Section[] };
 const TABS: Tab[] = [
   { label: 'Top', href: 'news', sections: ['news'] },
   { label: 'New', href: 'newest', sections: ['newest'] },
-  { label: 'Ask', href: 'ask', sections: ['ask'] },
+  { label: 'Best', href: 'best', sections: ['best', 'bestcomments'] },
   { label: 'Show', href: 'show', sections: ['show'] },
 ];
 const MORE: Tab[] = [
+  { label: 'Ask', href: 'ask', sections: ['ask'] },
   { label: 'Past', href: 'front', sections: ['front'] },
-  { label: 'Best', href: 'best', sections: ['best', 'bestcomments'] },
   { label: 'Comments', href: 'newcomments', sections: ['newcomments'] },
   { label: 'Jobs', href: 'jobs', sections: ['jobs'] },
 ];
 
 const isIn = (tab: Tab, section: Section | null) => section !== null && tab.sections.includes(section);
 
+/** Asks HN when the page itself can't say who is logged in. Undefined until it answers. */
+const useViewer = (known: PageMeta['viewer']): Viewer | undefined => {
+  const [asked, setAsked] = useState<Viewer | undefined>(undefined);
+  useEffect(() => {
+    if (known !== 'unknown') return;
+    fetchViewer().then(
+      (v) => setAsked(v === 'unknown' ? null : v),
+      () => setAsked(null),
+    );
+  }, [known]);
+  return known === 'unknown' ? asked : known;
+};
+
 export function Header({ meta }: { meta: PageMeta }) {
   const [panel, setPanel] = usePanel();
   const toggle = (p: NonNullable<typeof panel>) => setPanel(panel === p ? null : p);
-  const viewer = meta.viewer;
+  const viewer = useViewer(meta.viewer);
   const goto = encodeURIComponent(meta.url.pathname.slice(1) + meta.url.search);
   const inMore = MORE.find((t) => isIn(t, meta.section));
 
@@ -75,7 +90,7 @@ export function Header({ meta }: { meta: PageMeta }) {
           {viewer ? (
             <AccountMenu viewer={viewer} meta={meta} open={panel === 'account'} onToggle={() => toggle('account')} />
           ) : (
-            <a class="mg-btn mg-btn-ghost" href={`login?goto=${goto}`}>Log in</a>
+            viewer === null && <a class="mg-btn mg-btn-ghost" href={`login?goto=${goto}`}>Log in</a>
           )}
           <button
             type="button"
@@ -120,10 +135,12 @@ function AccountMenu({ viewer, meta, open, onToggle }: { viewer: NonNullable<Vie
         type="button"
         class={`mg-account${open ? ' is-open' : ''}`}
         title="Your account"
+        aria-label={`${viewer.name}, account`}
         aria-expanded={open}
         aria-controls="mg-account-menu"
         onClick={onToggle}
       >
+        <span class="mg-avatar mg-account-initial">{viewer.name.slice(0, 1).toUpperCase()}</span>
         <span class="mg-account-name">{viewer.name}</span>
         <span class="mg-account-karma" title="Karma">{viewer.karma.toLocaleString()}</span>
         <IconChevronDown size={14} class="mg-tab-chev" />

@@ -60,7 +60,8 @@ html[data-mg-theme='black'] {
   }
 }
 
-/* A rail's position in its row is its ancestor's depth. Mono is the fallback before settings apply. */
+/* A rail's data-level is the depth of the comment whose line it carries. Mono is the fallback before settings
+   apply. */
 .mg-rail {
   --rail: color-mix(in srgb, var(--faint) 50%, var(--bg));
   --rail-hot: var(--accent);
@@ -69,20 +70,99 @@ html[data-mg-lines='rainbow'] .mg-rail {
   --rail: color-mix(in srgb, var(--rail-hue) var(--rail-mix), var(--bg));
   --rail-hot: var(--rail-hue);
 }
-html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 1) { --rail-hue: var(--hue-1); }
-html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 2) { --rail-hue: var(--hue-2); }
-html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 3) { --rail-hue: var(--hue-3); }
-html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 4) { --rail-hue: var(--hue-4); }
-html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 5) { --rail-hue: var(--hue-5); }
-html[data-mg-lines='rainbow'] .mg-rail:nth-child(6n + 6) { --rail-hue: var(--hue-6); }
+html[data-mg-lines='rainbow'] .mg-rail[data-level='0'] { --rail-hue: var(--hue-1); }
+html[data-mg-lines='rainbow'] .mg-rail[data-level='1'] { --rail-hue: var(--hue-2); }
+html[data-mg-lines='rainbow'] .mg-rail[data-level='2'] { --rail-hue: var(--hue-3); }
+html[data-mg-lines='rainbow'] .mg-rail[data-level='3'] { --rail-hue: var(--hue-4); }
+html[data-mg-lines='rainbow'] .mg-rail[data-level='4'] { --rail-hue: var(--hue-5); }
+html[data-mg-lines='rainbow'] .mg-rail[data-level='5'] { --rail-hue: var(--hue-6); }
 html[data-mg-lines='accent'] .mg-rail {
   --rail: color-mix(in srgb, var(--accent) var(--rail-fade, 22%), var(--bg));
 }
-html[data-mg-lines='accent'] .mg-rail:nth-child(1) { --rail-fade: 72%; }
-html[data-mg-lines='accent'] .mg-rail:nth-child(2) { --rail-fade: 56%; }
-html[data-mg-lines='accent'] .mg-rail:nth-child(3) { --rail-fade: 44%; }
-html[data-mg-lines='accent'] .mg-rail:nth-child(4) { --rail-fade: 35%; }
-html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
+html[data-mg-lines='accent'] .mg-rail[data-level='0'] { --rail-fade: 72%; }
+html[data-mg-lines='accent'] .mg-rail[data-level='1'] { --rail-fade: 56%; }
+html[data-mg-lines='accent'] .mg-rail[data-level='2'] { --rail-fade: 44%; }
+html[data-mg-lines='accent'] .mg-rail[data-level='3'] { --rail-fade: 35%; }
+html[data-mg-lines='accent'] .mg-rail[data-level='4'] { --rail-fade: 28%; }
+
+/* Thread lines bend into each reply. A comment's own line runs down the left of its text from under its
+   header, and each reply's column picks it up: straight through, or curving into the reply's header at
+   --elbow-y. The last reply's curve ends the line. */
+.mg-thread {
+  --rail-w: 22px; /* one indent step */
+  --rail-x: 10px; /* where the line runs inside a step */
+  --rail-r: 8px; /* the bend's radius */
+  --elbow-y: 16px; /* middle of a reply's header line */
+}
+.mg-rails {
+  display: flex;
+  flex: none;
+}
+.mg-rail {
+  --line: var(--rail);
+  position: relative;
+  flex: none;
+  width: var(--rail-w);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.mg-rail.is-hot {
+  --line: var(--rail-hot);
+}
+.mg-rail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--rail-x);
+  width: 2px;
+  background: var(--line);
+  transition: background 0.12s ease;
+}
+.mg-rail[data-line='none']::before,
+.mg-rail[data-line='end']::before {
+  visibility: hidden;
+}
+.mg-rail[data-line='tee']::after,
+.mg-rail[data-line='end']::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--elbow-y) - var(--rail-r));
+  left: var(--rail-x);
+  width: calc(var(--rail-w) - var(--rail-x) + 5px);
+  height: calc(var(--rail-r) + 1px);
+  border-bottom-left-radius: var(--rail-r);
+  border-left: 2px solid var(--line);
+  border-bottom: 2px solid var(--line);
+  transition: border-color 0.12s ease;
+}
+/* The last reply's line and its bend are one box, so no seam shows where the straight part meets the curve. */
+.mg-rail[data-line='end']::after {
+  top: 0;
+  height: calc(var(--elbow-y) + 1px);
+}
+/* A new reply's bend is drawn in the accent, next to its "new" badge. */
+.mg-c.is-new > .mg-rails > .mg-rail:last-child:not(.is-hot)::after {
+  border-color: var(--accent);
+}
+
+/* The body sits one step in, so the comment's own line runs beside it to the first reply. */
+.mg-c-body {
+  position: relative;
+  margin-left: var(--rail-w);
+}
+/* A comment opened on its own page has its thread below it, not beside it. */
+.mg-root-comment .mg-c-body {
+  margin-left: 0;
+}
+.mg-rail-own {
+  position: absolute;
+  top: 2px;
+  bottom: calc(-1 * var(--c-pad-b));
+  left: calc(-1 * (var(--rail-w) + var(--c-pad)));
+}
 
 /* Top-level threads are separated; replies inside a thread sit closer together. */
 .mg-thread > .mg-c.is-top:not(:first-child) {
@@ -91,8 +171,8 @@ html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
   border-top: 1px solid var(--rule);
 }
 .mg-c:not(.is-top) > .mg-c-main {
+  --c-pad-b: 6px;
   padding-top: 6px;
-  padding-bottom: 6px;
 }
 
 .mg-thread .mg-c-head {
@@ -104,8 +184,6 @@ html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
 }
 .mg-c.is-replying > .mg-c-main {
   background: var(--bg-soft);
-  box-shadow: inset 2px 0 0 var(--accent);
-  padding-left: 12px;
 }
 
 .mg-commtext .mg-quote {
@@ -196,7 +274,14 @@ html[data-mg-lines='accent'] .mg-rail:nth-child(5) { --rail-fade: 28%; }
 
 @media (max-width: 760px) {
   /* Keep in step with RAIL_CAP.narrow in Thread.tsx. */
-  .mg-rail:nth-child(n + 4) {
+  .mg-thread {
+    --rail-w: 16px;
+    --rail-x: 7px;
+    --rail-r: 6px;
+  }
+  .mg-rail[data-level='3'],
+  .mg-rail[data-level='4'],
+  .mg-rail[data-level='5'] {
     display: none;
   }
   .mg-c-replyto {

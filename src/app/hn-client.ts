@@ -1,8 +1,9 @@
 import { parseReplyForm } from '../hn/item';
+import { parseMeta } from '../hn/meta';
 import { parsePage } from '../hn/registry';
 import { parseUserProfile } from '../hn/user';
 import { canonical, type FeedItems, type Outcome } from '../feed/feed';
-import type { Href, Page, ReplyForm, UserProfile } from '../hn/types';
+import type { Href, Page, PageMeta, ReplyForm, UserProfile } from '../hn/types';
 
 /**
  * Every network call the extension makes. All of them are same-origin requests to news.ycombinator.com
@@ -42,6 +43,9 @@ export const performAction = async (h: Href): Promise<boolean> => {
   await fetchHtml(h);
   return true;
 };
+
+/** Who is logged in, read from the top bar of `lists`, a small framed page. */
+export const fetchViewer = async (): Promise<PageMeta['viewer']> => parseMeta(await fetchHtml('lists'), abs('lists')).viewer;
 
 const userCache = new Map<string, Promise<UserProfile>>();
 
