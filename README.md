@@ -2,7 +2,7 @@
 
 Margin is a free browser extension for Chrome, Edge and Firefox that redesigns every page of [Hacker News](https://news.ycombinator.com). It works on page two and beyond, on `?next=` pagination, on past front pages, on profiles and on the account pages, because it picks a layout from the shape of each page instead of its URL.
 
-Every feature is free. There is no account, no paid tier and no tracking.
+Every feature is free. There is no account, no paid tier and no tracking. Margin is an independent project, not affiliated with Y Combinator or Hacker News.
 
 ![Front page in the light theme](docs/screenshots/front-page-light.png)
 
@@ -152,4 +152,8 @@ node scripts/shots.mjs [outDir]  # screenshots of each page kind in each theme
 
 `src/hn/` turns an HN page into one typed `Page` value. A registry of detectors picks the parser from the DOM shape (`table.fatitem`, the profile table, comment rows, story rows), so any URL that produces a known shape gets the new design. `src/ui/` renders that value with Preact, and `src/store/` is the only code that reads or writes extension storage. `src/search/` turns a search URL into an Algolia request and the response into results. See `DESIGN.md` for the data shapes and the runtime flow.
 
-Hacker News is a trademark of Y Combinator. Margin is not affiliated with Y Combinator.
+## License
+
+MIT, see [LICENSE](LICENSE). The extension bundles [Preact](https://preactjs.com), also MIT; both notices ship inside the extension as `LICENSE.txt`.
+
+Hacker News is a trademark of Y Combinator. Margin is not affiliated with, endorsed by or sponsored by Y Combinator or Hacker News.

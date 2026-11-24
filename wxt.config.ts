@@ -1,8 +1,20 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'wxt';
+
+const read = (path: string) => readFileSync(path, 'utf8').trim();
 
 export default defineConfig({
   srcDir: 'src',
   runner: { disabled: true },
+  hooks: {
+    // MIT asks for its notice in every copy, so the extension ships Margin's license and that of Preact, which it bundles.
+    'build:publicAssets': (_wxt, files) => {
+      files.push({
+        relativeDest: 'LICENSE.txt',
+        contents: `${read('LICENSE')}\n\n---\n\nThis extension includes Preact (https://preactjs.com):\n\n${read('node_modules/preact/LICENSE')}\n`,
+      });
+    },
+  },
   zip: { excludeSources: ['todo.md', '.cache/**', 'fixtures/**'] },
   manifest: ({ browser }) => ({
     name: 'Margin for Hacker News',
