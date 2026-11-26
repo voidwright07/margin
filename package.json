@@ -3,7 +3,7 @@
   "description": "A calm, readable redesign of every Hacker News page.",
   "private": true,
   "license": "MIT",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "build": "wxt build && wxt build -b firefox --mv3",
