@@ -7,7 +7,7 @@ import { BookmarkButton, UserLink } from './common';
 import { collapsedPreview, markQuotes } from './commentText';
 import { Composer, QUOTE_EVENT, quoteText, type QuoteDetail } from './Composer';
 import { applyHighlights } from './highlight';
-import { IconDown, IconUp } from './icons';
+import { IconChevronDown, IconDown, IconUp } from './icons';
 import { focusComment } from './keyboard';
 import { navTarget } from './threadNav';
 import { useHnToggle } from './useToggle';
@@ -90,6 +90,13 @@ export const visibleRows = (comments: Comment[], sizes: number[], collapsed: Rea
   });
   rows.forEach((row, j) => (row.repliesShown = (rows[j + 1]?.comment.depth ?? -1) > row.comment.depth));
   return rows;
+};
+
+/** One of the six rail hues, fixed per username, so each person in a conversation keeps one tint. */
+export const userHue = (name: string): number => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 6) + 1;
 };
 
 /** Light up every segment of one ancestor's thread line, across rows, without re-rendering. */
@@ -257,32 +264,35 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
         ))}
       </div>
       <div class="mg-c-main">
+        {!collapsed && c.depth < RAIL_CAP.wide && (
+          <button
+            type="button"
+            tabIndex={-1}
+            class={`mg-rail mg-rail-own${row.repliesShown ? '' : ' is-leaf'}`}
+            aria-hidden="true"
+            data-anc={c.id}
+            data-level={c.depth}
+            title="Collapse this thread"
+            onClick={onToggle}
+            onMouseEnter={() => setHot(c.id, true)}
+            onMouseLeave={() => setHot(c.id, false)}
+          />
+        )}
         {parent && !collapsed && c.depth > RAIL_CAP.narrow && <ReplyingTo parent={parent} deep={c.depth > RAIL_CAP.wide} />}
-        <div class="mg-c-head" onClick={(e) => isHeaderToggleClick(e) && onToggle()}>
-          {!c.deleted && <CommentVotes comment={c} />}
+        <div class="mg-c-head" style={c.deleted ? undefined : `--user-hue: var(--hue-${userHue(c.by)})`} onClick={(e) => isHeaderToggleClick(e) && onToggle()}>
           {c.deleted ? <span class="mg-c-deleted">[deleted]</span> : <UserLink name={c.by} op={isOp} />}
           {isOp && <span class="mg-op">OP</span>}
           <a class="mg-c-age" href={`item?id=${c.id}`} title={c.time}>
             {c.ageText}
           </a>
+          <button type="button" class="mg-c-toggle" data-mg-collapse aria-expanded={!collapsed} title={collapsed ? 'Expand (x)' : 'Collapse (x)'} onClick={onToggle}>
+            <IconChevronDown size={14} />
+            {collapsed && `+${size}`}
+          </button>
           {isNew && <span class="mg-new">new</span>}
           {c.dead && <span class="mg-flag-tag">dead</span>}
-          <button type="button" class="mg-c-toggle" data-mg-collapse aria-expanded={!collapsed} title={collapsed ? 'Expand (x)' : 'Collapse (x)'} onClick={onToggle}>
-            {collapsed ? `[+${size}]` : '[–]'}
-          </button>
+          {!c.deleted && !collapsed && <CommentVotes comment={c} />}
           {preview && <span class="mg-c-preview">“{preview}”</span>}
-          {!collapsed && parent && (
-            <span class="mg-c-navs">
-              {root && root !== parent && (
-                <a href={`#${root.id}`} title="Root of this thread (r)" onClick={jumpTo(root.id)}>
-                  root
-                </a>
-              )}
-              <a href={`#${parent.id}`} title="Parent comment (h)" onClick={jumpTo(parent.id)}>
-                parent
-              </a>
-            </span>
-          )}
           {!collapsed && !c.deleted && (
             <span class="mg-c-acts">
               {onReply && (
@@ -311,6 +321,18 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
               <BookmarkButton label="comment" make={() => commentBookmark(c, story, Date.now())} />
             </span>
           )}
+          {!collapsed && parent && (
+            <span class="mg-c-navs">
+              {root && root !== parent && (
+                <a href={`#${root.id}`} title="Root of this thread (r)" onClick={jumpTo(root.id)}>
+                  root
+                </a>
+              )}
+              <a href={`#${parent.id}`} title="Parent comment (h)" onClick={jumpTo(parent.id)}>
+                parent
+              </a>
+            </span>
+          )}
           {showStory && story && (
             <span class="mg-c-on">
               on <a href={`item?id=${story.id}`}>{story.title}</a>
@@ -319,20 +341,6 @@ export function CommentView({ row, op, isNew, showStory, onToggle, onCollapseAnc
         </div>
         {!collapsed && (
           <div class="mg-c-body">
-            {row.repliesShown && c.depth < RAIL_CAP.wide && (
-              <button
-                type="button"
-                tabIndex={-1}
-                class="mg-rail mg-rail-own"
-                aria-hidden="true"
-                data-anc={c.id}
-                data-level={c.depth}
-                title="Collapse this thread"
-                onClick={onToggle}
-                onMouseEnter={() => setHot(c.id, true)}
-                onMouseLeave={() => setHot(c.id, false)}
-              />
-            )}
             {!c.deleted && <CommentBody comment={c} highlights={highlights} itemId={itemId} canQuote={canQuote} />}
             {reply}
           </div>

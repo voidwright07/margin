@@ -981,11 +981,12 @@ html.mg-on body > center {
 }
 .mg-c-main {
   --c-pad: 6px;
+  --c-pad-t: 10px;
   --c-pad-b: 8px;
   position: relative;
   flex: 1;
   min-width: 0;
-  padding: 10px 4px var(--c-pad-b) var(--c-pad);
+  padding: var(--c-pad-t) 4px var(--c-pad-b) var(--c-pad);
   border-radius: 6px;
 }
 .mg-c[data-mg-focused] {
@@ -1003,6 +1004,9 @@ html.mg-on body > center {
   color: var(--muted);
 }
 .mg-c-head .mg-user {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--user-hue, var(--faint)) 15%, var(--bg));
   font-weight: 600;
   color: var(--ink);
 }
@@ -1054,18 +1058,30 @@ html.mg-on body > center {
   display: none;
 }
 .mg-c-toggle {
-  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -6px;
+  padding: 2px;
   border: 0;
+  border-radius: 4px;
   background: none;
   color: var(--faint);
-  font: 12px var(--mg-font-mono);
+  font: 12px var(--mg-font);
   cursor: pointer;
 }
 .mg-c-toggle:hover {
   color: var(--ink);
+  background: var(--bg-soft);
+}
+.mg-c-toggle svg {
+  transition: transform 0.12s ease;
 }
 .mg-c.is-collapsed .mg-c-toggle {
   color: var(--accent-ink);
+}
+.mg-c.is-collapsed .mg-c-toggle svg {
+  transform: rotate(-90deg);
 }
 .mg-c.is-collapsed .mg-c-main {
   --c-pad-b: 6px;

@@ -82,7 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   openLinksInNewTab: false,
   keyboard: true,
   infiniteScroll: true,
-  threadLines: 'rainbow',
+  threadLines: 'mono',
 };
 
 export const HISTORY_CAP = 2000;

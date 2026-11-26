@@ -85,14 +85,14 @@ html[data-mg-lines='accent'] .mg-rail[data-level='2'] { --rail-fade: 44%; }
 html[data-mg-lines='accent'] .mg-rail[data-level='3'] { --rail-fade: 35%; }
 html[data-mg-lines='accent'] .mg-rail[data-level='4'] { --rail-fade: 28%; }
 
-/* Thread lines bend into each reply. A comment's own line runs down the left of its text from under its
-   header, and each reply's column picks it up: straight through, or curving into the reply's header at
-   --elbow-y. The last reply's curve ends the line. */
+/* Thread lines step down the tree. Each comment's own line starts level with its header and runs down the
+   gutter beside its text. A reply's column picks the line up and steps right at --elbow-y, one indent, into
+   the top of the reply's own line. The last reply's step ends its parent's line; a leaf's line ends with its
+   text. */
 .mg-thread {
   --rail-w: 22px; /* one indent step */
-  --rail-x: 10px; /* where the line runs inside a step */
-  --rail-r: 8px; /* the bend's radius */
-  --elbow-y: 16px; /* middle of a reply's header line */
+  --rail-x: 6px; /* where the line runs inside a step */
+  --elbow-y: 17px; /* middle of a reply's header line: its 6px top padding plus half the header */
 }
 .mg-rails {
   display: flex;
@@ -117,7 +117,7 @@ html[data-mg-lines='accent'] .mg-rail[data-level='4'] { --rail-fade: 28%; }
   top: 0;
   bottom: 0;
   left: var(--rail-x);
-  width: 2px;
+  width: 1px;
   background: var(--line);
   transition: background 0.12s ease;
 }
@@ -125,43 +125,48 @@ html[data-mg-lines='accent'] .mg-rail[data-level='4'] { --rail-fade: 28%; }
 .mg-rail[data-line='end']::before {
   visibility: hidden;
 }
+/* The step: across one indent to the reply's own line. The last reply's step also carries the line down to
+   it, in one box, so no seam shows at the corner. */
 .mg-rail[data-line='tee']::after,
 .mg-rail[data-line='end']::after {
   content: '';
   position: absolute;
-  top: calc(var(--elbow-y) - var(--rail-r));
+  top: var(--elbow-y);
   left: var(--rail-x);
-  width: calc(var(--rail-w) - var(--rail-x) + 5px);
-  height: calc(var(--rail-r) + 1px);
-  border-bottom-left-radius: var(--rail-r);
-  border-left: 2px solid var(--line);
-  border-bottom: 2px solid var(--line);
-  transition: border-color 0.12s ease;
+  width: calc(var(--rail-w) + 1px);
+  height: 1px;
+  background: var(--line);
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
-/* The last reply's line and its bend are one box, so no seam shows where the straight part meets the curve. */
 .mg-rail[data-line='end']::after {
   top: 0;
   height: calc(var(--elbow-y) + 1px);
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: none;
 }
-/* A new reply's bend is drawn in the accent, next to its "new" badge. */
+/* A new reply's step is drawn in the accent, next to its "new" badge. */
 .mg-c.is-new > .mg-rails > .mg-rail:last-child:not(.is-hot)::after {
   border-color: var(--accent);
 }
+.mg-c.is-new > .mg-rails > .mg-rail[data-line='tee']:last-child:not(.is-hot)::after {
+  background: var(--accent);
+}
 
-/* The body sits one step in, so the comment's own line runs beside it to the first reply. */
-.mg-c-body {
-  position: relative;
-  margin-left: var(--rail-w);
-}
-/* A comment opened on its own page has its thread below it, not beside it. */
-.mg-root-comment .mg-c-body {
-  margin-left: 0;
-}
+/* A comment's own line fills the gutter left of its header and text. It meets the next row when replies
+   follow, and stops with the text on a leaf. */
 .mg-rail-own {
   position: absolute;
-  top: 2px;
-  bottom: calc(-1 * var(--c-pad-b));
-  left: calc(-1 * (var(--rail-w) + var(--c-pad)));
+  top: calc(var(--c-pad-t) + var(--elbow-y) - 6px);
+  bottom: 0;
+  left: 0;
+}
+.mg-rail-own.is-leaf {
+  bottom: var(--c-pad-b);
+}
+.mg-c.is-collapsed .mg-rail-own,
+.mg-root-comment .mg-rail-own {
+  display: none;
 }
 
 /* Top-level threads are separated; replies inside a thread sit closer together. */
@@ -171,8 +176,15 @@ html[data-mg-lines='accent'] .mg-rail[data-level='4'] { --rail-fade: 28%; }
   border-top: 1px solid var(--rule);
 }
 .mg-c:not(.is-top) > .mg-c-main {
+  --c-pad-t: 6px;
   --c-pad-b: 6px;
-  padding-top: 6px;
+}
+/* Header and text start one step in, leaving the gutter for the comment's own line. */
+.mg-thread .mg-c-main {
+  --c-pad: var(--rail-w);
+}
+.mg-c-head .mg-user.is-op {
+  background: var(--accent-soft);
 }
 
 .mg-thread .mg-c-head {
@@ -223,6 +235,17 @@ html[data-mg-lines='accent'] .mg-rail[data-level='4'] { --rail-fade: 28%; }
 }
 .mg-c-navs a:hover {
   color: var(--accent-ink) !important;
+}
+@media (hover: hover) {
+  .mg-c-navs {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+  .mg-c-main:hover .mg-c-navs,
+  .mg-c:focus-within .mg-c-navs,
+  .mg-c[data-mg-focused] .mg-c-navs {
+    opacity: 1;
+  }
 }
 
 /* Past the rail cap a comment names its parent instead of indenting further. */
@@ -276,8 +299,7 @@ html[data-mg-lines='accent'] .mg-rail[data-level='4'] { --rail-fade: 28%; }
   /* Keep in step with RAIL_CAP.narrow in Thread.tsx. */
   .mg-thread {
     --rail-w: 16px;
-    --rail-x: 7px;
-    --rail-r: 6px;
+    --rail-x: 4px;
   }
   .mg-rail[data-level='3'],
   .mg-rail[data-level='4'],

@@ -101,7 +101,7 @@ await check('j moves focus and x collapses the focused thread', async () => {
   const before = await page.$$eval('.mg-c', (els) => els.length);
   await page.keyboard.type('jx');
   const toggle = await page.$eval('.mg-c[data-mg-focused] .mg-c-toggle', (b) => b.textContent);
-  assert.equal(toggle, '[+14]');
+  assert.equal(toggle, '+14');
   const after = await page.$$eval('.mg-c', (els) => els.length);
   assert.equal(before - after, 13);
   await page.keyboard.type('x');
@@ -404,7 +404,7 @@ await check("thread lines bend into each reply, and each comment's own line runs
   await resetStorage();
   await open('item?id=50442736');
   const g = await page.evaluate(() => {
-    const parent = document.querySelector('.mg-c.is-top:has(.mg-rail-own)');
+    const parent = document.querySelector('.mg-c.is-top:has(.mg-rail-own:not(.is-leaf))');
     const id = parent.dataset.id;
     const own = parent.querySelector('.mg-rail-own').getBoundingClientRect();
     const replies = [...document.querySelectorAll('.mg-c')].filter((c) => c.querySelector('.mg-rails > .mg-rail:last-child')?.dataset.anc === id);
@@ -455,9 +455,9 @@ await check('the threadLines setting changes the rail colour', async () => {
       await Promise.all(document.getAnimations().map((a) => a.finished));
       return getComputedStyle(el, '::before').backgroundColor;
     });
-  const rainbow = await rail();
-  const colours = { rainbow };
-  for (const threadLines of ['accent', 'mono']) {
+  const mono = await rail();
+  const colours = { mono };
+  for (const threadLines of ['rainbow', 'accent']) {
     await resetStorage({ threadLines });
     await page.waitForFunction((v) => document.documentElement.dataset.mgLines === v, { timeout: 2000 }, threadLines);
     colours[threadLines] = await rail();

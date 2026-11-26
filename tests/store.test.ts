@@ -135,12 +135,12 @@ describe('infinite scroll setting', () => {
 });
 
 describe('thread settings and collapsed comments', () => {
-  it('validates threadLines, defaulting to rainbow', () => {
-    expect(defaultState().settings.threadLines).toBe('rainbow');
+  it('validates threadLines, defaulting to mono', () => {
+    expect(defaultState().settings.threadLines).toBe('mono');
     expect(parseState({ settings: { threadLines: 'accent' } }).settings.threadLines).toBe('accent');
-    expect(parseState({ settings: { threadLines: 'mono' } }).settings.threadLines).toBe('mono');
-    expect(parseState({ settings: { threadLines: 'neon' } }).settings.threadLines).toBe('rainbow');
-    expect(parseState({ settings: { threadLines: 3 } }).settings.threadLines).toBe('rainbow');
+    expect(parseState({ settings: { threadLines: 'rainbow' } }).settings.threadLines).toBe('rainbow');
+    expect(parseState({ settings: { threadLines: 'neon' } }).settings.threadLines).toBe('mono');
+    expect(parseState({ settings: { threadLines: 3 } }).settings.threadLines).toBe('mono');
   });
 
   it('keeps collapsed ids on the story history entry across visits', () => {
